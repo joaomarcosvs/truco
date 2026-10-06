@@ -35,10 +35,11 @@ Se uma tarefa parecer exigir algo fora do escopo, pare e pergunte.
 ## 3. Stack e build
 
 - Java 21+ (records, sealed interfaces, `switch` com pattern matching)
-- Maven multi-módulo
+- Maven multi-módulo, sempre pelo Maven Wrapper (`./mvnw`, Maven 3.9.16). Requer `JAVA_HOME` apontando para um JDK 21+.
 - JUnit 5, AssertJ, jqwik (testes de propriedade)
-- Comandos: `mvn -q test` · `mvn -q -pl truco-core test` · `mvn -q verify`
-- groupId e pacote base: **TODO — perguntar ao usuário no marco M1**
+- Comandos: `./mvnw -q test` · `./mvnw -q -pl truco-core test` · `./mvnw -q verify` · `./mvnw spotless:apply` (formata o código)
+- groupId: `io.github.joaomarcosvs` · pacote base: `io.github.joaomarcosvs.truco` (bots em `...truco.bots`, CLI em `...truco.cli`)
+- CI: GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw verify` a cada push na `main` e em pull requests
 
 ```
 truco/
@@ -113,7 +114,7 @@ public sealed interface Acao permits JogarCarta, JogarEncoberta, Descartar, Recu
 
 ## 6. Testes
 
-- Cada regra de `docs/regras-truco-paulista.md` tem um ID (`RG-...`). **Todo teste de regra cita o ID** no `@DisplayName`.
+- Cada regra de `docs/regras-truco-paulista.md` tem um ID (`RG-...`). **Todo teste de regra cita o ID** no `@DisplayName` (em propriedades jqwik, no `@Label`, porque o jqwik não lê `@DisplayName`).
 - **Unitários** por regra, usando as tabelas e exemplos do documento de regras.
 - **Cenário (golden):** seed fixa + sequência de ações → eventos e placar esperados.
 - **Propriedade/fuzz (jqwik):** bots aleatórios jogam milhares de partidas e verifica-se que:
@@ -188,7 +189,7 @@ O que isso exige do desenho de hoje:
 
 ## 11. Status
 
-- [ ] M1 Fundação
+- [x] M1 Fundação
 - [ ] M2 Cartas e força
 - [ ] M3 Rodada sem aumentos
 - [ ] M4 Aumentos
@@ -200,4 +201,9 @@ O que isso exige do desenho de hoje:
 - [ ] M10 Prontidão de variante
 
 **Decisões registradas**
-- (vazio)
+- **M1** Build: Maven Wrapper com Maven 3.9.16, `maven.compiler.release` 21, `-Xlint:all` com warnings tratados como erro e versões de plugins fixadas no POM pai.
+- **M1** Testes: JUnit 5.14 (não o 6), porque o jqwik 1.10 roda sobre a JUnit Platform 1.14. JUnit, AssertJ e jqwik vêm do POM pai, em escopo `test`, para todos os módulos. Classes de teste terminam em `Test`, inclusive as de propriedade (padrão do Surefire).
+- **M1** jqwik reporta só as propriedades que falharam e guarda as seeds de falhas em `target/` (`junit-platform.properties`).
+- **M1** O enforcer barra no `truco-core` qualquer dependência fora do escopo `test` (princípio 1).
+- **M1** Formatação: Spotless com palantir-java-format (até 120 colunas), checada no `verify`. Finais de linha LF (`.gitattributes` e `.editorconfig`), exceto `*.cmd`.
+- **M1** RG-ENC-4 e RG-ONZE-3 confirmadas como `[DEFINIDA]` e serão regras fixas. Como não restou regra `[A CONFIRMAR]`, a `OpcoesTrucoPaulista` só será criada quando surgir uma.

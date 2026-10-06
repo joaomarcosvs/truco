@@ -1,0 +1,18 @@
+# Maven
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# jqwik
+.jqwik-database
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
