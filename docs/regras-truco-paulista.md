@@ -98,7 +98,7 @@ Cada regra tem um ID (`RG-...`). Todo teste de regra cita o ID.
 - **RG-ENC-1 [DEFINIDA]** O jogador pode jogar uma carta **encoberta** (virada para baixo) apenas **a partir da 2ª vaza**.
 - **RG-ENC-2 [DEFINIDA]** A carta encoberta **não conta na comparação** da vaza: perde para qualquer carta aberta. Vence a vaza a carta aberta mais forte. Se só um jogador jogou carta aberta e os demais encobriram, esse jogador (e o parceiro, no 2x2) vence a vaza.
 - **RG-ENC-3 [DEFINIDA]** A identidade da carta encoberta nunca é revelada ao adversário, nem no fim da rodada. O adversário só sabe que foi jogada uma encoberta.
-- **RG-ENC-4 [A CONFIRMAR]** Se **todas** as cartas da vaza forem encobertas, a vaza empata.
+- **RG-ENC-4 [DEFINIDA]** Se **todas** as cartas da vaza forem encobertas, a vaza empata.
 
 ## 7. Aumentos: truco, seis, nove e doze
 
@@ -125,7 +125,7 @@ Cada regra tem um ID (`RG-...`). Todo teste de regra cita o ID.
 
 - **RG-ONZE-1 [DEFINIDA]** Quando **só um** lado tem 11 pontos, é **Rodada de Onze**: esse jogador, vendo suas cartas, decide **jogar** (a rodada vale 3 pontos) ou **correr** (o adversário ganha 1 ponto).
 - **RG-ONZE-2 [DEFINIDA]** Na Rodada de Onze não há pedido de aumento: o valor é fixo em 3.
-- **RG-ONZE-3 [A CONFIRMAR]** Na Rodada de Onze há descarte (RG-DESC-9 só exclui a Rodada Escurinho), e ele acontece **antes** da decisão de jogar ou correr.
+- **RG-ONZE-3 [DEFINIDA]** Na Rodada de Onze há descarte (RG-DESC-9 só exclui a Rodada Escurinho), e ele acontece **antes** da decisão de jogar ou correr.
 - **RG-ESCURINHO-1 [DEFINIDA]** Quando **os dois** lados têm 11 pontos, é **Rodada Escurinho**: a rodada vale 1 ponto, as cartas são jogadas **às cegas** (o jogador não vê a própria mão e escolhe pela posição), não há aumentos, carta encoberta nem descarte, e quem vencer a rodada vence a partida.
 
 ## 9. Fim da partida
