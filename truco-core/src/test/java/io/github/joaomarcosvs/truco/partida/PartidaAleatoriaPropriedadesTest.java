@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.stream.IntStream;
 import net.jqwik.api.Arbitraries;
@@ -38,7 +39,10 @@ import net.jqwik.api.Label;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
 
-/** Partidas com escolhas aleatórias entre as ações legais, conferindo os invariantes do core a cada passo. */
+/**
+ * Partidas com escolhas aleatórias entre as ações legais, conferindo os invariantes do core a cada passo. Umas jogam
+ * alguns passos, com escolhas que o jqwik consegue encolher; outras jogam a partida inteira, até o fim.
+ */
 class PartidaAleatoriaPropriedadesTest {
 
     private static final List<Carta> BARALHO =
@@ -69,6 +73,9 @@ class PartidaAleatoriaPropriedadesTest {
     /** RG-AUM-1, copiada do documento de regras. */
     private static final Set<Integer> ESCADA = Set.of(1, 3, 6, 9, 12);
 
+    /** Limite de passos de uma partida inteira; bem acima do que uma partida precisa. */
+    private static final int LIMITE_DE_PASSOS = 5_000;
+
     /** Um passo da partida: o estado antes, quem agiu, a ação e o que o motor devolveu. */
     private record Passo(EstadoDaPartida antes, JogadorId jogador, Acao acao, Aplicada aplicada) {}
 
@@ -76,11 +83,7 @@ class PartidaAleatoriaPropriedadesTest {
     @Label("Conservação: mãos, baralho restante, vira, descartadas e jogadas somam sempre as 40 cartas, sem"
             + " repetição")
     void conservacaoDasCartas(@ForAll long seed, @ForAll("escolhas") List<Integer> escolhas) {
-        for (Passo passo : jogar(seed, escolhas)) {
-            assertThat(CartasPresentes.naRodada(passo.antes().rodada())).containsExactlyInAnyOrderElementsOf(BARALHO);
-            assertThat(CartasPresentes.naRodada(passo.aplicada().novoEstado().rodada()))
-                    .containsExactlyInAnyOrderElementsOf(BARALHO);
-        }
+        jogar(seed, escolhas).forEach(PartidaAleatoriaPropriedadesTest::conferirConservacao);
     }
 
     @Property
@@ -102,39 +105,7 @@ class PartidaAleatoriaPropriedadesTest {
     @Property
     @Label("RG-VIS-1 e RG-VIS-2: visão e eventos de um jogador nunca mostram as cartas do outro nem as do baralho")
     void nadaVaza(@ForAll long seed, @ForAll("escolhas") List<Integer> escolhas) {
-        for (Passo passo : jogar(seed, escolhas)) {
-            EstadoDaPartida depois = passo.aplicada().novoEstado();
-            for (JogadorId jogador : List.of(ANA, BETO)) {
-                VisaoDoJogador visao = MOTOR.visaoDe(depois, jogador);
-                // A carta da vez no descarte é pública (sai da vira e das descartadas); o que não pode vazar é quem
-                // a tem. Ela é conferida à parte, e o resto da visão passa pela varredura.
-                Optional<Carta> cartaDaVez = depois.rodada().fase() instanceof AguardandoDescarte(Carta carta)
-                        ? Optional.of(carta)
-                        : Optional.empty();
-                assertThat(visao.cartaDaVezNoDescarte()).isEqualTo(cartaDaVez);
-                assertNaoMostra(semCartaDaVez(visao), ocultasPara(jogador, depois.rodada()), "a visão de " + jogador);
-
-                // Os eventos até RodadaIniciada falam da rodada que terminou; os seguintes, da rodada nova.
-                List<Evento> eventos = passo.aplicada().eventos().stream()
-                        .filter(evento -> evento.visivelPara(jogador))
-                        .toList();
-                int inicioDaNovaRodada = IntStream.range(0, eventos.size())
-                        .filter(i -> eventos.get(i) instanceof RodadaIniciada)
-                        .findFirst()
-                        .orElse(eventos.size());
-                Set<Carta> ocultasAntes = ocultasPara(jogador, passo.antes().rodada());
-                ocultasAntes.removeAll(cartasReveladas(passo));
-                if (depois.numeroDaRodada() == passo.antes().numeroDaRodada()) {
-                    // A carta comprada no descarte passa a ser do próprio jogador, que pode vê-la (RG-DESC-8).
-                    ocultasAntes.removeAll(depois.rodada().maoDe(jogador));
-                }
-                assertNaoMostra(eventos.subList(0, inicioDaNovaRodada), ocultasAntes, "os eventos de " + jogador);
-                assertNaoMostra(
-                        eventos.subList(inicioDaNovaRodada, eventos.size()),
-                        ocultasPara(jogador, depois.rodada()),
-                        "os eventos de " + jogador);
-            }
-        }
+        jogar(seed, escolhas).forEach(PartidaAleatoriaPropriedadesTest::conferirQueNadaVaza);
     }
 
     @Property
@@ -165,10 +136,98 @@ class PartidaAleatoriaPropriedadesTest {
         assertThat(jogar(seed, escolhas)).isEqualTo(jogar(seed, escolhas));
     }
 
+    @Property(tries = 200)
+    @Label("RG-FIM-1: toda partida termina, com a vencedora em 12 pontos ou mais e a outra abaixo de 12")
+    void partidaSempreTermina(@ForAll long seed, @ForAll long sementeDasEscolhas) {
+        List<Passo> passos = jogarAteOFim(seed, sementeDasEscolhas);
+
+        EstadoDaPartida fim = passos.getLast().aplicada().novoEstado();
+        assertThat(fim.rodada().fase()).isInstanceOf(FaseDaRodada.PartidaFinalizada.class);
+        EquipeId vencedora = ((FaseDaRodada.PartidaFinalizada) fim.rodada().fase()).vencedora();
+        EquipeId outra = vencedora.equals(EQUIPE_DA_ANA) ? EQUIPE_DO_BETO : EQUIPE_DA_ANA;
+        assertThat(fim.placar().pontosDe(vencedora)).isGreaterThanOrEqualTo(12);
+        assertThat(fim.placar().pontosDe(outra)).isLessThan(12);
+        assertThat(MOTOR.acoesLegais(fim, ANA)).isEmpty();
+        assertThat(MOTOR.acoesLegais(fim, BETO)).isEmpty();
+    }
+
+    @Property(tries = 100)
+    @Label("RG-AUM-7, RG-ONZE-2, RG-ESCURINHO-1 e RG-DESC-9: na Rodada de Onze e na Escurinho ninguém pede aumento,"
+            + " e na Escurinho ninguém encobre nem descarta")
+    void restricoesDasRodadasEspeciais(@ForAll long seed, @ForAll long sementeDasEscolhas) {
+        for (Passo passo : jogarAteOFim(seed, sementeDasEscolhas)) {
+            TipoDeRodada tipo = passo.antes().rodada().tipo();
+            for (JogadorId jogador : List.of(ANA, BETO)) {
+                List<Acao> legais = MOTOR.acoesLegais(passo.antes(), jogador);
+                if (!(tipo instanceof TipoDeRodada.Normal)) {
+                    assertThat(legais).doesNotContain(new PedirAumento());
+                }
+                if (tipo instanceof TipoDeRodada.Escurinho) {
+                    assertThat(legais)
+                            .noneMatch(acao -> acao instanceof JogarEncoberta
+                                    || acao instanceof Descartar
+                                    || acao instanceof RecusarDescarte);
+                }
+            }
+        }
+    }
+
+    @Property(tries = 100)
+    @Label("RG-VIS-1 a RG-VIS-3: em partidas inteiras, nada vaza, inclusive a própria mão na Escurinho, e as 40"
+            + " cartas se conservam")
+    void nadaVazaEmPartidasInteiras(@ForAll long seed, @ForAll long sementeDasEscolhas) {
+        for (Passo passo : jogarAteOFim(seed, sementeDasEscolhas)) {
+            conferirConservacao(passo);
+            conferirQueNadaVaza(passo);
+        }
+    }
+
     /** Qual das ações legais cada jogador escolhe, passo a passo (o resto da divisão pelo número de ações legais). */
     @Provide
     Arbitrary<List<Integer>> escolhas() {
         return Arbitraries.integers().between(0, 99).list().ofMaxSize(80);
+    }
+
+    private static void conferirConservacao(Passo passo) {
+        assertThat(CartasPresentes.naRodada(passo.antes().rodada())).containsExactlyInAnyOrderElementsOf(BARALHO);
+        assertThat(CartasPresentes.naRodada(passo.aplicada().novoEstado().rodada()))
+                .containsExactlyInAnyOrderElementsOf(BARALHO);
+    }
+
+    private static void conferirQueNadaVaza(Passo passo) {
+        EstadoDaPartida depois = passo.aplicada().novoEstado();
+        for (JogadorId jogador : List.of(ANA, BETO)) {
+            VisaoDoJogador visao = MOTOR.visaoDe(depois, jogador);
+            // A carta da vez no descarte é pública (sai da vira e das descartadas); o que não pode vazar é quem a
+            // tem. Ela é conferida à parte, e o resto da visão passa pela varredura.
+            Optional<Carta> cartaDaVez = depois.rodada().fase() instanceof AguardandoDescarte(Carta carta)
+                    ? Optional.of(carta)
+                    : Optional.empty();
+            assertThat(visao.cartaDaVezNoDescarte()).isEqualTo(cartaDaVez);
+            assertNaoMostra(semCartaDaVez(visao), ocultasPara(jogador, depois.rodada()), "a visão de " + jogador);
+
+            // Os eventos até RodadaIniciada falam da rodada que terminou; os seguintes, da rodada nova.
+            List<Evento> eventos = passo.aplicada().eventos().stream()
+                    .filter(evento -> evento.visivelPara(jogador))
+                    .toList();
+            int inicioDaNovaRodada = IntStream.range(0, eventos.size())
+                    .filter(i -> eventos.get(i) instanceof RodadaIniciada)
+                    .findFirst()
+                    .orElse(eventos.size());
+            Set<Carta> ocultasAntes = ocultasPara(jogador, passo.antes().rodada());
+            ocultasAntes.removeAll(cartasReveladas(passo));
+            if (depois.numeroDaRodada() == passo.antes().numeroDaRodada()) {
+                // A carta comprada no descarte passa a ser do próprio jogador, que pode vê-la (RG-DESC-8).
+                List<Carta> compradas = new ArrayList<>(depois.rodada().maoDe(jogador));
+                compradas.removeAll(passo.antes().rodada().maoDe(jogador));
+                ocultasAntes.removeAll(compradas);
+            }
+            assertNaoMostra(eventos.subList(0, inicioDaNovaRodada), ocultasAntes, "os eventos de " + jogador);
+            assertNaoMostra(
+                    eventos.subList(inicioDaNovaRodada, eventos.size()),
+                    ocultasPara(jogador, depois.rodada()),
+                    "os eventos de " + jogador);
+        }
     }
 
     /**
@@ -195,6 +254,7 @@ class PartidaAleatoriaPropriedadesTest {
                 visao.placar(),
                 visao.numeroDaRodada(),
                 visao.carteador(),
+                visao.tipoDaRodada(),
                 visao.aposta(),
                 visao.vira(),
                 visao.descartadas(),
@@ -203,7 +263,8 @@ class PartidaAleatoriaPropriedadesTest {
                 visao.cartasNaMao(),
                 visao.vazas(),
                 visao.vazaAtual(),
-                visao.vezDe());
+                visao.vezDe(),
+                visao.vencedoraDaPartida());
     }
 
     private static void assertNaoMostra(Object objeto, Set<Carta> ocultas, String onde) {
@@ -214,17 +275,39 @@ class PartidaAleatoriaPropriedadesTest {
         }
     }
 
+    /** Joga até acabarem as escolhas ou a partida. */
     private static List<Passo> jogar(long seed, List<Integer> escolhas) {
         EstadoDaPartida estado = MOTOR.novaPartida(configuracao(seed));
         List<Passo> passos = new ArrayList<>();
         for (int escolha : escolhas) {
-            JogadorId jogador = daVez(estado);
-            List<Acao> legais = MOTOR.acoesLegais(estado, jogador);
-            Acao acao = legais.get(escolha % legais.size());
-            Aplicada aplicada = aplicarAceita(estado, jogador, acao);
-            passos.add(new Passo(estado, jogador, acao, aplicada));
-            estado = aplicada.novoEstado();
+            if (estado.rodada().fase() instanceof FaseDaRodada.PartidaFinalizada) {
+                break;
+            }
+            Passo passo = passo(estado, escolha);
+            passos.add(passo);
+            estado = passo.aplicada().novoEstado();
         }
         return passos;
+    }
+
+    /** Joga a partida inteira, escolhendo as ações com um gerador de semente fixa; falha se passar do limite. */
+    private static List<Passo> jogarAteOFim(long seed, long sementeDasEscolhas) {
+        Random escolhas = new Random(sementeDasEscolhas);
+        EstadoDaPartida estado = MOTOR.novaPartida(configuracao(seed));
+        List<Passo> passos = new ArrayList<>();
+        while (!(estado.rodada().fase() instanceof FaseDaRodada.PartidaFinalizada)) {
+            assertThat(passos).as("a partida deveria terminar").hasSizeLessThan(LIMITE_DE_PASSOS);
+            Passo passo = passo(estado, escolhas.nextInt(100));
+            passos.add(passo);
+            estado = passo.aplicada().novoEstado();
+        }
+        return passos;
+    }
+
+    private static Passo passo(EstadoDaPartida estado, int escolha) {
+        JogadorId jogador = daVez(estado);
+        List<Acao> legais = MOTOR.acoesLegais(estado, jogador);
+        Acao acao = legais.get(escolha % legais.size());
+        return new Passo(estado, jogador, acao, aplicarAceita(estado, jogador, acao));
     }
 }

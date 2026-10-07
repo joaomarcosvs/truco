@@ -17,6 +17,14 @@ public sealed interface FaseDaRodada {
         }
     }
 
+    /** Na Rodada de Onze, o jogador da equipe com 11 decide se joga ou corre (RG-ONZE-1). */
+    record DecisaoRodadaDeOnze(JogadorId jogador) implements FaseDaRodada {
+
+        public DecisaoRodadaDeOnze {
+            Objects.requireNonNull(jogador, "jogador");
+        }
+    }
+
     /** Aguardando o jogador jogar uma carta (RG-VAZA-1) ou, antes disso, pedir aumento (RG-AUM-2). */
     record AguardandoJogada(JogadorId jogador) implements FaseDaRodada {
 
@@ -30,6 +38,14 @@ public sealed interface FaseDaRodada {
 
         public AguardandoRespostaDeAumento {
             Objects.requireNonNull(respondedor, "respondedor");
+        }
+    }
+
+    /** A partida acabou: a equipe chegou aos pontos para vencer, e ninguém tem mais ações (RG-FIM-1). */
+    record PartidaFinalizada(EquipeId vencedora) implements FaseDaRodada {
+
+        public PartidaFinalizada {
+            Objects.requireNonNull(vencedora, "vencedora");
         }
     }
 }

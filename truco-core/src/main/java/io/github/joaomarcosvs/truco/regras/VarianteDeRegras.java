@@ -17,4 +17,10 @@ public interface VarianteDeRegras {
 
     /** Quanto a rodada pode valer. */
     EscadaDeApostas escadaDeApostas();
+
+    /** Rodadas especiais, como a Rodada de Onze e a Rodada Escurinho. */
+    RegrasEspeciais regrasEspeciais();
+
+    /** Quantos pontos vencem a partida. */
+    PontuacaoDaPartida pontuacaoDaPartida();
 }

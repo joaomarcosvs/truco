@@ -6,6 +6,9 @@ public enum MotivoDeRejeicao {
     /** Quem agiu não está na partida. */
     JOGADOR_DESCONHECIDO,
 
+    /** A partida já acabou (RG-FIM-1). */
+    PARTIDA_FINALIZADA,
+
     /** Não é a vez do jogador: nenhuma ação dele é legal agora. */
     NAO_E_A_VEZ_DO_JOGADOR,
 

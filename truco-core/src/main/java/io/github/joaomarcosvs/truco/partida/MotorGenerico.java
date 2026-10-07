@@ -22,16 +22,24 @@ import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
 import io.github.joaomarcosvs.truco.evento.DescarteEncerrado;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.JogadorCorreu;
+import io.github.joaomarcosvs.truco.evento.PartidaFinalizada;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
 import io.github.joaomarcosvs.truco.evento.RodadaAnulada;
+import io.github.joaomarcosvs.truco.evento.RodadaDeOnzeIniciada;
+import io.github.joaomarcosvs.truco.evento.RodadaEscurinhoIniciada;
 import io.github.joaomarcosvs.truco.evento.RodadaFinalizada;
 import io.github.joaomarcosvs.truco.evento.RodadaIniciada;
 import io.github.joaomarcosvs.truco.evento.VazaFinalizada;
 import io.github.joaomarcosvs.truco.partida.FaseDaRodada.AguardandoDescarte;
 import io.github.joaomarcosvs.truco.partida.FaseDaRodada.AguardandoJogada;
 import io.github.joaomarcosvs.truco.partida.FaseDaRodada.AguardandoRespostaDeAumento;
+import io.github.joaomarcosvs.truco.partida.FaseDaRodada.DecisaoRodadaDeOnze;
+import io.github.joaomarcosvs.truco.partida.TipoDeRodada.DeOnze;
+import io.github.joaomarcosvs.truco.partida.TipoDeRodada.Escurinho;
+import io.github.joaomarcosvs.truco.partida.TipoDeRodada.Normal;
 import io.github.joaomarcosvs.truco.regras.EscadaDeApostas;
 import io.github.joaomarcosvs.truco.regras.RegrasDeVaza;
+import io.github.joaomarcosvs.truco.regras.RegrasEspeciais;
 import io.github.joaomarcosvs.truco.regras.VarianteDeRegras;
 import io.github.joaomarcosvs.truco.visao.JogadaVisivel;
 import io.github.joaomarcosvs.truco.visao.VazaVisivel;
@@ -65,6 +73,7 @@ final class MotorGenerico implements MotorDeTruco {
             return List.of();
         }
         EscadaDeApostas escada = configuracao.variante().escadaDeApostas();
+        RegrasEspeciais especiais = configuracao.variante().regrasEspeciais();
         Rodada rodada = estado.rodada();
         List<Acao> acoes = new ArrayList<>();
         switch (rodada.fase()) {
@@ -77,20 +86,28 @@ final class MotorGenerico implements MotorDeTruco {
                 }
                 acoes.add(new RecusarDescarte());
             }
+            case DecisaoRodadaDeOnze decisao
+            when decisao.jogador().equals(jogador) -> {
+                // RG-ONZE-1: quem tem 11 decide jogar ou correr.
+                acoes.add(new Aceitar());
+                acoes.add(new Correr());
+            }
             case AguardandoJogada aguardando
             when aguardando.jogador().equals(jogador) -> {
                 int cartasNaMao = rodada.maoDe(jogador).size();
                 for (int indiceNaMao = 0; indiceNaMao < cartasNaMao; indiceNaMao++) {
                     acoes.add(new JogarCarta(indiceNaMao));
                 }
-                // RG-ENC-1: carta encoberta só a partir da 2ª vaza.
-                if (configuracao.variante().regrasDeVaza().permiteEncoberta(rodada.numeroDaVazaAtual())) {
+                // RG-ENC-1: carta encoberta só a partir da 2ª vaza; RG-ESCURINHO-1: nunca na Escurinho.
+                if (configuracao.variante().regrasDeVaza().permiteEncoberta(rodada.numeroDaVazaAtual())
+                        && especiais.permiteEncoberta(rodada.tipo())) {
                     for (int indiceNaMao = 0; indiceNaMao < cartasNaMao; indiceNaMao++) {
                         acoes.add(new JogarEncoberta(indiceNaMao));
                     }
                 }
-                // RG-AUM-2 e RG-AUM-5: na sua vez, antes de jogar, quem tem o direito pode pedir aumento.
-                if (escada.podeAumentar(rodada.aposta(), configuracao.equipeDe(jogador))) {
+                // RG-AUM-2, RG-AUM-5 e RG-AUM-7: na sua vez, antes de jogar, quem tem o direito pode pedir aumento.
+                if (especiais.permiteAumento(rodada.tipo())
+                        && escada.podeAumentar(rodada.aposta(), configuracao.equipeDe(jogador))) {
                     acoes.add(new PedirAumento());
                 }
                 acoes.add(new Correr()); // RG-AUM-6
@@ -106,8 +123,10 @@ final class MotorGenerico implements MotorDeTruco {
                 }
             }
             case AguardandoDescarte jaRespondeu -> {}
+            case DecisaoRodadaDeOnze outroJogador -> {}
             case AguardandoJogada outroJogador -> {}
             case AguardandoRespostaDeAumento outroJogador -> {}
+            case FaseDaRodada.PartidaFinalizada fim -> {} // RG-FIM-1
         }
         return List.copyOf(acoes);
     }
@@ -117,6 +136,9 @@ final class MotorGenerico implements MotorDeTruco {
         Objects.requireNonNull(acao, "acao");
         if (!estado.configuracao().participa(jogador)) {
             return new Rejeitada(MotivoDeRejeicao.JOGADOR_DESCONHECIDO);
+        }
+        if (estado.rodada().fase() instanceof FaseDaRodada.PartidaFinalizada) {
+            return new Rejeitada(MotivoDeRejeicao.PARTIDA_FINALIZADA);
         }
         List<Acao> legais = acoesLegais(estado, jogador);
         if (!legais.contains(acao)) {
@@ -130,7 +152,7 @@ final class MotorGenerico implements MotorDeTruco {
             case JogarCarta(int indiceNaMao) -> jogarCarta(estado, jogador, indiceNaMao, false, eventos);
             case JogarEncoberta(int indiceNaMao) -> jogarCarta(estado, jogador, indiceNaMao, true, eventos);
             case PedirAumento pedido -> pedirAumento(estado, jogador, eventos);
-            case Aceitar aceite -> aceitarAumento(estado, jogador, eventos);
+            case Aceitar aceite -> aceitar(estado, jogador, eventos);
             case Correr corrida -> correr(estado, jogador, eventos);
         };
         return new Aplicada(novoEstado, eventos);
@@ -148,12 +170,17 @@ final class MotorGenerico implements MotorDeTruco {
                 .collect(toMap(identity(), outro -> rodada.maoDe(outro).size()));
         Optional<Carta> cartaDaVezNoDescarte = Optional.empty();
         Optional<JogadorId> vezDe = Optional.empty();
+        Optional<EquipeId> vencedora = Optional.empty();
         switch (rodada.fase()) {
             // RG-DESC-10: no descarte todos decidem, e não se revela quem tem a carta da vez.
             case AguardandoDescarte(Carta cartaDaVez) -> cartaDaVezNoDescarte = Optional.of(cartaDaVez);
+            case DecisaoRodadaDeOnze(JogadorId decide) -> vezDe = Optional.of(decide);
             case AguardandoJogada(JogadorId daVez) -> vezDe = Optional.of(daVez);
             case AguardandoRespostaDeAumento resposta -> vezDe = Optional.of(resposta.respondedor());
+            case FaseDaRodada.PartidaFinalizada(EquipeId equipe) -> vencedora = Optional.of(equipe);
         }
+        // RG-VIS-3: na Rodada Escurinho, o jogador não vê a própria mão.
+        boolean maoVisivel = configuracao.variante().regrasEspeciais().maoVisivel(rodada.tipo());
         return new VisaoDoJogador(
                 jogador,
                 mesa,
@@ -161,17 +188,19 @@ final class MotorGenerico implements MotorDeTruco {
                 estado.placar(),
                 estado.numeroDaRodada(),
                 estado.carteador(),
+                rodada.tipo(),
                 rodada.aposta(),
                 rodada.vira(),
                 rodada.descarte().descartadas(),
                 cartaDaVezNoDescarte,
-                rodada.maoDe(jogador),
+                maoVisivel ? rodada.maoDe(jogador) : List.of(),
                 cartasNaMao,
                 rodada.vazas().stream()
                         .map(vaza -> new VazaVisivel(visiveis(vaza.jogadas(), jogador), vaza.resultado()))
                         .toList(),
                 visiveis(rodada.vazaAtual(), jogador),
-                vezDe);
+                vezDe,
+                vencedora);
     }
 
     /** As jogadas como o observador as vê: a carta encoberta só aparece para quem a jogou (RG-ENC-3). */
@@ -256,7 +285,12 @@ final class MotorGenerico implements MotorDeTruco {
             vazaAtual = List.of();
             Optional<DesfechoDaRodada> desfecho = regras.desfecho(vazas);
             if (desfecho.isPresent()) {
-                return encerrarRodada(estado, desfecho.get(), eventos);
+                // A rodada encerrada guarda a última vaza; ela continua no estado se a partida acabar aqui.
+                Rodada encerrada =
+                        rodada.comMaos(maos, rodada.baralhoRestante()).comVazas(vazas, vazaAtual);
+                EstadoDaPartida aoFimDaRodada = new EstadoDaPartida(
+                        configuracao, estado.placar(), estado.numeroDaRodada(), estado.carteador(), encerrada);
+                return encerrarRodada(aoFimDaRodada, desfecho.get(), eventos);
             }
         }
         return comRodada(estado, rodada.comMaos(maos, rodada.baralhoRestante()).comVazas(vazas, vazaAtual));
@@ -285,31 +319,41 @@ final class MotorGenerico implements MotorDeTruco {
         return comRodada(estado, estado.rodada().comAposta(comPedido));
     }
 
-    private static EstadoDaPartida aceitarAumento(EstadoDaPartida estado, JogadorId jogador, List<Evento> eventos) {
-        Aposta aceita = aceita(estado.rodada().aposta(), estado.configuracao().equipeDe(jogador));
+    private static EstadoDaPartida aceitar(EstadoDaPartida estado, JogadorId jogador, List<Evento> eventos) {
+        Rodada rodada = estado.rodada();
+        if (rodada.tipo() instanceof DeOnze onze && rodada.fase() instanceof DecisaoRodadaDeOnze) {
+            // RG-ONZE-1 e RG-ONZE-2: decidindo jogar, a rodada passa a valer o valor fixo da Rodada de Onze.
+            int valor = estado.configuracao().variante().regrasEspeciais().valorAoJogarARodadaDeOnze();
+            eventos.add(new AumentoAceito(jogador, valor));
+            return comRodada(
+                    estado,
+                    rodada.comTipo(new DeOnze(onze.equipeComOnze(), true))
+                            .comAposta(new Aposta(valor, Optional.empty(), Optional.empty())));
+        }
+        Aposta aceita = aceita(rodada.aposta(), estado.configuracao().equipeDe(jogador));
         eventos.add(new AumentoAceito(jogador, aceita.valor()));
-        return comRodada(estado, estado.rodada().comAposta(aceita));
+        return comRodada(estado, rodada.comAposta(aceita));
     }
 
     private static EstadoDaPartida correr(EstadoDaPartida estado, JogadorId jogador, List<Evento> eventos) {
         ConfiguracaoDaPartida configuracao = estado.configuracao();
         EscadaDeApostas escada = configuracao.variante().escadaDeApostas();
-        Aposta aposta = estado.rodada().aposta();
+        Rodada rodada = estado.rodada();
         eventos.add(new JogadorCorreu(jogador));
-        Optional<PedidoDeAumento> pendente = aposta.pedidoPendente();
+        if (rodada.fase() instanceof DecisaoRodadaDeOnze) {
+            // RG-ONZE-1: correndo da Rodada de Onze, o adversário ganha o valor fixo da corrida.
+            int pontos = configuracao.variante().regrasEspeciais().valorAoCorrerDaRodadaDeOnze();
+            return darVitoria(estado, equipeAdversaria(configuracao, jogador), pontos, eventos);
+        }
+        Optional<PedidoDeAumento> pendente = rodada.aposta().pedidoPendente();
         if (pendente.isPresent()) {
             // RG-AUM-3 e RG-AUM-4: quem pediu ganha o valor que a rodada tinha antes do pedido.
             int pontos = escada.valorAoCorrer(pendente.get().nivelProposto());
             return darVitoria(estado, configuracao.equipeDe(pendente.get().pedinte()), pontos, eventos);
         }
-        // RG-AUM-6: quem corre na própria vez entrega a rodada à equipe adversária.
-        EquipeId propria = configuracao.equipeDe(jogador);
-        EquipeId adversaria = configuracao.equipes().stream()
-                .map(Equipe::id)
-                .filter(equipe -> !equipe.equals(propria))
-                .findFirst()
-                .orElseThrow();
-        return darVitoria(estado, adversaria, escada.valorAoDesistir(aposta.valor()), eventos);
+        // RG-AUM-6: quem corre na própria vez entrega a rodada à equipe adversária pelo valor atual.
+        int pontos = escada.valorAoDesistir(rodada.aposta().valor());
+        return darVitoria(estado, equipeAdversaria(configuracao, jogador), pontos, eventos);
     }
 
     /**
@@ -338,6 +382,13 @@ final class MotorGenerico implements MotorDeTruco {
         Placar placar = estado.placar().somando(equipe, pontos);
         eventos.add(new RodadaFinalizada(estado.numeroDaRodada(), equipe, pontos));
         eventos.add(new PlacarAtualizado(placar));
+        if (vencedora(estado.configuracao(), placar).isPresent()) {
+            // RG-PARTIDA-1 e RG-FIM-1: a partida termina na hora, sem distribuir outra rodada.
+            eventos.add(new PartidaFinalizada(equipe, placar));
+            EstadoDaPartida finalizado = new EstadoDaPartida(
+                    estado.configuracao(), placar, estado.numeroDaRodada(), estado.carteador(), estado.rodada());
+            return comRodada(finalizado, estado.rodada());
+        }
         return proximaRodada(estado, placar, eventos);
     }
 
@@ -354,6 +405,8 @@ final class MotorGenerico implements MotorDeTruco {
             JogadorId carteador,
             List<Evento> eventos) {
         VarianteDeRegras variante = configuracao.variante();
+        RegrasEspeciais especiais = variante.regrasEspeciais();
+        TipoDeRodada tipo = especiais.tipoDaRodada(placar); // RG-ONZE-1 e RG-ESCURINHO-1
         List<Carta> baralho =
                 Sorteio.embaralhar(variante.composicaoDoBaralho().cartas(), configuracao.seed(), numeroDaRodada);
         List<JogadorId> ordem = configuracao.jogadoresAPartirDe(configuracao.aDireitaDe(carteador));
@@ -371,16 +424,25 @@ final class MotorGenerico implements MotorDeTruco {
         Optional<Carta> vira =
                 variante.ordemDeForca().usaVira() ? Optional.of(baralho.get(proxima++)) : Optional.empty();
         Aposta aposta = Aposta.inicial(variante.escadaDeApostas().valorInicial()); // RG-PARTIDA-3
-        // RG-DESC-2: o descarte, se a variante tiver, vem antes de tudo na rodada.
-        Descarte descarte = variante.regrasDeDescarte().sequencia(vira).isEmpty()
+        // RG-DESC-2: o descarte, se houver, vem antes de tudo na rodada; RG-DESC-9: não há na Escurinho.
+        Descarte descarte = variante.regrasDeDescarte().sequencia(vira).isEmpty() || !especiais.permiteDescarte(tipo)
                 ? Descarte.encerrado(List.of())
                 : Descarte.inicial();
 
         eventos.add(new RodadaIniciada(numeroDaRodada, carteador, aposta.valor(), vira));
-        ordem.forEach(jogador -> eventos.add(new CartasDistribuidas(jogador, maos.get(jogador))));
+        switch (tipo) {
+            case DeOnze onze -> eventos.add(new RodadaDeOnzeIniciada(onze.equipeComOnze()));
+            case Escurinho escurinho -> eventos.add(new RodadaEscurinhoIniciada());
+            case Normal normal -> {}
+        }
+        // RG-VIS-3: na Escurinho, ninguém recebe a identidade das próprias cartas.
+        if (especiais.maoVisivel(tipo)) {
+            ordem.forEach(jogador -> eventos.add(new CartasDistribuidas(jogador, maos.get(jogador))));
+        }
 
         // A fase provisória é trocada pela de proximaFase em comRodada.
         Rodada rodada = new Rodada(
+                tipo,
                 aposta,
                 vira,
                 maos,
@@ -394,7 +456,7 @@ final class MotorGenerico implements MotorDeTruco {
 
     /** O estado com a rodada dada, na fase que {@link #proximaFase} decidir. */
     private static EstadoDaPartida comRodada(EstadoDaPartida estado, Rodada rodada) {
-        FaseDaRodada fase = proximaFase(estado.configuracao(), estado.carteador(), rodada);
+        FaseDaRodada fase = proximaFase(estado.configuracao(), estado.carteador(), estado.placar(), rodada);
         return new EstadoDaPartida(
                 estado.configuracao(),
                 estado.placar(),
@@ -404,14 +466,23 @@ final class MotorGenerico implements MotorDeTruco {
     }
 
     /**
-     * Ponto único que decide a fase da rodada (CLAUDE.md, seção 7): primeiro o descarte, se ainda não acabou; depois um
-     * pedido de aumento pendente; com uma vaza em andamento, joga quem está à direita do último; no começo das vazas,
-     * quem está à direita do carteador; depois de uma vaza, quem a variante indicar.
+     * Ponto único que decide a fase da rodada (CLAUDE.md, seção 7): primeiro o fim da partida; depois o descarte, se
+     * ainda não acabou; a decisão da Rodada de Onze; um pedido de aumento pendente; com uma vaza em andamento, joga quem
+     * está à direita do último; no começo das vazas, quem está à direita do carteador; depois de uma vaza, quem a
+     * variante indicar.
      */
-    private static FaseDaRodada proximaFase(ConfiguracaoDaPartida configuracao, JogadorId carteador, Rodada rodada) {
+    private static FaseDaRodada proximaFase(
+            ConfiguracaoDaPartida configuracao, JogadorId carteador, Placar placar, Rodada rodada) {
+        Optional<EquipeId> vencedora = vencedora(configuracao, placar);
+        if (vencedora.isPresent()) {
+            return new FaseDaRodada.PartidaFinalizada(vencedora.get()); // RG-FIM-1
+        }
         Optional<Carta> cartaDaVez = cartaDaVez(configuracao, rodada);
         if (cartaDaVez.isPresent()) {
-            return new AguardandoDescarte(cartaDaVez.get()); // RG-DESC-2
+            return new AguardandoDescarte(cartaDaVez.get()); // RG-DESC-2 e RG-ONZE-3
+        }
+        if (rodada.tipo() instanceof DeOnze onze && !onze.decidiuJogar()) {
+            return new DecisaoRodadaDeOnze(jogadorDa(configuracao, onze.equipeComOnze())); // RG-ONZE-1
         }
         Optional<PedidoDeAumento> pendente = rodada.aposta().pedidoPendente();
         if (pendente.isPresent()) {
@@ -430,6 +501,35 @@ final class MotorGenerico implements MotorDeTruco {
                 .variante()
                 .regrasDeVaza()
                 .abreAProxima(rodada.vazas().getLast()));
+    }
+
+    /** A equipe que já chegou aos pontos para vencer, se houver (RG-PARTIDA-1). */
+    private static Optional<EquipeId> vencedora(ConfiguracaoDaPartida configuracao, Placar placar) {
+        int pontosParaVencer = configuracao.variante().pontuacaoDaPartida().pontosParaVencer();
+        return configuracao.equipes().stream()
+                .map(Equipe::id)
+                .filter(equipe -> placar.pontosDe(equipe) >= pontosParaVencer)
+                .findFirst();
+    }
+
+    /** O jogador que decide pela equipe; na v1, cada equipe tem um jogador só. */
+    private static JogadorId jogadorDa(ConfiguracaoDaPartida configuracao, EquipeId equipe) {
+        return configuracao.equipes().stream()
+                .filter(candidata -> candidata.id().equals(equipe))
+                .findFirst()
+                .orElseThrow()
+                .jogadores()
+                .getFirst();
+    }
+
+    /** A outra equipe: o truco tem sempre duas. */
+    private static EquipeId equipeAdversaria(ConfiguracaoDaPartida configuracao, JogadorId jogador) {
+        EquipeId propria = configuracao.equipeDe(jogador);
+        return configuracao.equipes().stream()
+                .map(Equipe::id)
+                .filter(equipe -> !equipe.equals(propria))
+                .findFirst()
+                .orElseThrow();
     }
 
     /** A carta da vez no descarte: a seguinte da sequência depois das já descartadas (RG-DESC-3, RG-DESC-4). */

@@ -13,8 +13,11 @@ public sealed interface Evento
                 CartasDistribuidas,
                 DescarteEncerrado,
                 JogadorCorreu,
+                PartidaFinalizada,
                 PlacarAtualizado,
                 RodadaAnulada,
+                RodadaDeOnzeIniciada,
+                RodadaEscurinhoIniciada,
                 RodadaFinalizada,
                 RodadaIniciada,
                 VazaFinalizada {

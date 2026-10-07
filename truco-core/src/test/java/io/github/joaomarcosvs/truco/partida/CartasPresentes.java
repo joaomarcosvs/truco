@@ -25,13 +25,14 @@ final class CartasPresentes {
     }
 
     /**
-     * As cartas que o jogador não pode ver: as mãos dos outros, o baralho restante (RG-VIS-2) e as cartas que os outros
-     * jogaram encobertas (RG-ENC-3).
+     * As cartas que o jogador não pode ver: as mãos dos outros, o baralho restante (RG-VIS-2), as cartas que os outros
+     * jogaram encobertas (RG-ENC-3) e, na Rodada Escurinho, a própria mão (RG-VIS-3).
      */
     static Set<Carta> ocultasPara(JogadorId jogador, Rodada rodada) {
         Set<Carta> ocultas = new HashSet<>(rodada.baralhoRestante());
+        boolean escurinho = rodada.tipo() instanceof TipoDeRodada.Escurinho;
         rodada.maos().forEach((dono, mao) -> {
-            if (!dono.equals(jogador)) {
+            if (!dono.equals(jogador) || escurinho) {
                 ocultas.addAll(mao);
             }
         });

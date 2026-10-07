@@ -80,7 +80,8 @@ Pacotes sob o pacote base: `carta`, `regras`, `partida`, `acao`, `evento`, `visa
 - `ConfiguracaoDaPartida` (jogadores/equipes, variante, seed)
 - `EstadoDaPartida`: placar, número da rodada, carteador, seed, rodada atual
 - `Rodada`, `Vaza`, `Jogada`
-- `FaseDaRodada` (sealed): `AguardandoDescarte(cartaDaVez)`, `AguardandoJogada(jogador)`, `AguardandoRespostaDeAumento(respondedor, nivelProposto)`, `DecisaoRodadaDeOnze(jogador)`, `PartidaFinalizada`. O fim de uma rodada não é fase: é o evento `RodadaFinalizada`, e o mesmo `aplicar` já distribui a rodada seguinte.
+- `TipoDeRodada` (sealed): `Normal`, `DeOnze(equipeComOnze, decidiuJogar)`, `Escurinho`. Decidido pelo placar no começo da rodada.
+- `FaseDaRodada` (sealed): `AguardandoDescarte(cartaDaVez)`, `AguardandoJogada(jogador)`, `AguardandoRespostaDeAumento(respondedor, nivelProposto)`, `DecisaoRodadaDeOnze(jogador)`, `PartidaFinalizada(vencedora)`. O fim de uma rodada não é fase: é o evento `RodadaFinalizada`, e o mesmo `aplicar` já distribui a rodada seguinte.
 
 **API do motor**
 
@@ -195,7 +196,7 @@ O que isso exige do desenho de hoje:
 - [x] M4 Aumentos (correr na própria vez, de RG-AUM-6, entra no M5; as exceções de RG-AUM-7 e "rodada de 12 vence a partida", de RG-AUM-1, no M7)
 - [x] M5 Carta encoberta e correr (a proibição de encoberta na Rodada Escurinho entra no M7)
 - [x] M6 Descarte (RG-DESC-9, sem descarte na Rodada Escurinho, e o descarte na Rodada de Onze entram no M7)
-- [ ] M7 Partida completa
+- [x] M7 Partida completa
 - [ ] M8 Jogável (bots + CLI)
 - [ ] M9 Protocolo
 - [ ] M10 Prontidão de variante
@@ -228,3 +229,9 @@ O que isso exige do desenho de hoje:
 - **M6** `FaseDaRodada.AguardandoDescarte(cartaDaVez)`; `Acao` ganhou `Descartar` e `RecusarDescarte`; `Evento` ganhou `CartaDescartada` (pública, com quem descartou), `CartaRecebidaPorDescarte` (privada) e `DescarteEncerrado`. A `Rodada` guarda um `Descarte` (descartadas, se acabou, quem já respondeu e se o dono descarta), e a visão mostra as descartadas e a carta da vez, com `vezDe` vazio no descarte.
 - **M6** `RegrasDeDescarte.sequencia(vira)` dá a sequência (vazia = sem descarte); a carta da vez é a seguinte depois das descartadas. A carta comprada sai do topo do baralho restante e fica na posição da descartada. Sem baralho restante, ninguém pode descartar (caso-limite que as regras não cobrem).
 - **M6** O descarte entra em `proximaFase` antes de tudo (RG-DESC-2), e toda mudança de estado da rodada passa por `MotorGenerico.comRodada`, que recalcula a fase.
+- **M7** A `VarianteDeRegras` ganhou duas peças. `RegrasEspeciais` diz o tipo da rodada pelo placar, o que cada tipo permite (aumento, encoberta, descarte, mão visível) e os valores da Rodada de Onze (3 ao jogar, 1 ao correr). `PontuacaoDaPartida` dá os pontos para vencer (12). O `TipoDeRodada` fica na `Rodada` e na `VisaoDoJogador`. `Evento` ganhou `RodadaDeOnzeIniciada`, `RodadaEscurinhoIniciada` e `PartidaFinalizada(vencedora, placar)`.
+- **M7** Ordem em `proximaFase`: fim da partida, descarte, `DecisaoRodadaDeOnze`, pedido pendente e, por último, as vazas. Assim, na Rodada de Onze, o descarte vem antes da decisão (RG-ONZE-3). Decide quem tem 11, mesmo que não seja quem abre a 1ª vaza. `Aceitar` (jogar) emite `AumentoAceito(jogador, 3)`, e `Correr` dá 1 ponto ao adversário.
+- **M7** Suposição, porque as regras não tratam do caso: depois de decidir jogar a Rodada de Onze, e na Escurinho, `Correr` na própria vez continua valendo (RG-AUM-6). Quem corre entrega o valor da rodada: 3 na Onze e 1 na Escurinho, o que na Escurinho encerra a partida.
+- **M7** Fim de partida: quando um lado chega aos pontos para vencer, o `aplicar` emite `PartidaFinalizada` depois de `PlacarAtualizado` e não distribui outra rodada. O estado guarda a rodada final, com a última vaza, na fase `PartidaFinalizada(vencedora)`. Depois disso, `acoesLegais` volta vazia, `aplicar` devolve `Rejeitada(PARTIDA_FINALIZADA)` (motivo novo) e a visão mostra `vencedoraDaPartida`.
+- **M7** Na Escurinho não há `CartasDistribuidas`, e a visão traz a `mao` vazia (só `cartasNaMao`). O jogador escolhe a carta pela posição, e a carta jogada é revelada a todos.
+- **M7** Testes de partida inteira: propriedades (a partida sempre termina, as restrições da Onze e da Escurinho valem, nada vaza, nem a própria mão na Escurinho) e um golden de partida completa (seed 2026) que passa pela Rodada de Onze e pela Escurinho.

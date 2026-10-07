@@ -11,6 +11,7 @@ import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
+import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.AumentoAceito;
@@ -23,8 +24,11 @@ import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
 import io.github.joaomarcosvs.truco.evento.DescarteEncerrado;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.JogadorCorreu;
+import io.github.joaomarcosvs.truco.evento.PartidaFinalizada;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
 import io.github.joaomarcosvs.truco.evento.RodadaAnulada;
+import io.github.joaomarcosvs.truco.evento.RodadaDeOnzeIniciada;
+import io.github.joaomarcosvs.truco.evento.RodadaEscurinhoIniciada;
 import io.github.joaomarcosvs.truco.evento.RodadaFinalizada;
 import io.github.joaomarcosvs.truco.evento.RodadaIniciada;
 import io.github.joaomarcosvs.truco.evento.VazaFinalizada;
@@ -150,6 +154,65 @@ class PartidaGoldenTest {
                         ana recebe 3♠ 2♥ 3♣""");
     }
 
+    @Test
+    @DisplayName("Seed 2026, cada jogador faz a primeira ação legal, mas corre de toda Rodada de Onze: partida até o"
+            + " fim, passando pela Rodada de Onze e pela Escurinho")
+    void partidaCompleta() {
+        EstadoDaPartida estado = MOTOR.novaPartida(configuracao(2026));
+        List<String> linhas = new ArrayList<>();
+        while (!(estado.rodada().fase() instanceof FaseDaRodada.PartidaFinalizada)) {
+            JogadorId jogador = daVez(estado);
+            Acao escolhida = estado.rodada().fase() instanceof FaseDaRodada.DecisaoRodadaDeOnze
+                    ? new Correr()
+                    : MOTOR.acoesLegais(estado, jogador).getFirst();
+            Aplicada aplicada = aplicarAceita(estado, jogador, escolhida);
+            aplicada.eventos().stream()
+                    .filter(evento -> evento instanceof RodadaFinalizada
+                            || evento instanceof RodadaAnulada
+                            || evento instanceof RodadaDeOnzeIniciada
+                            || evento instanceof RodadaEscurinhoIniciada
+                            || evento instanceof JogadorCorreu
+                            || evento instanceof PartidaFinalizada)
+                    .forEach(evento -> linhas.add(descrever(evento)));
+            estado = aplicada.novoEstado();
+        }
+        linhas.add(descrever(new PlacarAtualizado(estado.placar())));
+
+        // Até a rodada 20, Ana vence 9 e Beto 11: Rodada de Onze para Beto, que corre duas vezes e leva Ana a 11. Com
+        // 11 a 11 vem a Escurinho, e quem a vence (Beto) vence a partida.
+        assertThat(String.join("\n", linhas)).isEqualTo("""
+                        rodada 1: ana marca 1
+                        rodada 2: beto marca 1
+                        rodada 3: ana marca 1
+                        rodada 4: ana marca 1
+                        rodada 5: beto marca 1
+                        rodada 6: ana marca 1
+                        rodada 7: beto marca 1
+                        rodada 8: ana marca 1
+                        rodada 9: beto marca 1
+                        rodada 10: ana marca 1
+                        rodada 11: beto marca 1
+                        rodada 12: beto marca 1
+                        rodada 13: beto marca 1
+                        rodada 14: ana marca 1
+                        rodada 15: ana marca 1
+                        rodada 16: ana marca 1
+                        rodada 17: beto marca 1
+                        rodada 18: beto marca 1
+                        rodada 19: beto marca 1
+                        rodada 20: beto marca 1
+                        rodada de onze para beto
+                        beto corre
+                        rodada 21: ana marca 1
+                        rodada de onze para beto
+                        beto corre
+                        rodada 22: ana marca 1
+                        rodada escurinho
+                        rodada 23: beto marca 1
+                        partida finalizada: beto vence
+                        placar: ana 11 x 12 beto""");
+    }
+
     /** A 1ª rodada, que já vem distribuída no estado inicial, descrita como os eventos das rodadas seguintes. */
     private static List<String> inicio(EstadoDaPartida estado) {
         Rodada rodada = estado.rodada();
@@ -184,6 +247,9 @@ class PartidaGoldenTest {
             case CartaDescartada descartada -> "%s descarta %s".formatted(descartada.jogador(), descartada.carta());
             case CartaRecebidaPorDescarte recebida -> "%s compra %s".formatted(recebida.jogador(), recebida.carta());
             case DescarteEncerrado encerrado -> "descarte encerrado";
+            case RodadaDeOnzeIniciada onze -> "rodada de onze para %s".formatted(onze.equipeComOnze());
+            case RodadaEscurinhoIniciada escurinho -> "rodada escurinho";
+            case PartidaFinalizada fim -> "partida finalizada: %s vence".formatted(fim.vencedora());
             case VazaFinalizada vaza ->
                 "vaza %d: %s"
                         .formatted(

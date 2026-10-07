@@ -3,8 +3,10 @@ package io.github.joaomarcosvs.truco.regras.paulista;
 import io.github.joaomarcosvs.truco.regras.ComposicaoDoBaralho;
 import io.github.joaomarcosvs.truco.regras.EscadaDeApostas;
 import io.github.joaomarcosvs.truco.regras.OrdemDeForca;
+import io.github.joaomarcosvs.truco.regras.PontuacaoDaPartida;
 import io.github.joaomarcosvs.truco.regras.RegrasDeDescarte;
 import io.github.joaomarcosvs.truco.regras.RegrasDeVaza;
+import io.github.joaomarcosvs.truco.regras.RegrasEspeciais;
 import io.github.joaomarcosvs.truco.regras.VarianteDeRegras;
 
 /**
@@ -18,6 +20,8 @@ public record TrucoPaulista() implements VarianteDeRegras {
     private static final RegrasDeDescarte REGRAS_DE_DESCARTE = new RegrasDeDescartePaulista();
     private static final RegrasDeVaza REGRAS_DE_VAZA = new RegrasDeVazaPaulista(ORDEM_DE_FORCA);
     private static final EscadaDeApostas ESCADA_DE_APOSTAS = new EscadaDeApostasPaulista();
+    private static final RegrasEspeciais REGRAS_ESPECIAIS = new RegrasEspeciaisPaulista();
+    private static final PontuacaoDaPartida PONTUACAO_DA_PARTIDA = new PontuacaoDaPartidaPaulista();
 
     @Override
     public ComposicaoDoBaralho composicaoDoBaralho() {
@@ -42,5 +46,15 @@ public record TrucoPaulista() implements VarianteDeRegras {
     @Override
     public EscadaDeApostas escadaDeApostas() {
         return ESCADA_DE_APOSTAS;
+    }
+
+    @Override
+    public RegrasEspeciais regrasEspeciais() {
+        return REGRAS_ESPECIAIS;
+    }
+
+    @Override
+    public PontuacaoDaPartida pontuacaoDaPartida() {
+        return PONTUACAO_DA_PARTIDA;
     }
 }
