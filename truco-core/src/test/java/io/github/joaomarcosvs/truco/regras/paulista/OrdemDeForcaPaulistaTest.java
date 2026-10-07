@@ -89,6 +89,12 @@ class OrdemDeForcaPaulistaTest {
     }
 
     @Test
+    @DisplayName("RG-CARTAS-3 e RG-CARTAS-4: o Truco Paulista vira uma carta para definir a manilha")
+    void usaVira() {
+        assertThat(ordem.usaVira()).isTrue();
+    }
+
+    @Test
     @DisplayName("Comparar cartas do Truco Paulista sem vira é erro de programação")
     void exigeVira() {
         assertThatIllegalArgumentException().isThrownBy(() -> ordem.forca(carta("4♦"), Optional.empty()));

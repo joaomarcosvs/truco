@@ -8,4 +8,10 @@ public interface VarianteDeRegras {
 
     /** Como as cartas se comparam na disputa de uma vaza. */
     OrdemDeForca ordemDeForca();
+
+    /** Como as vazas são jogadas e decidem a rodada. */
+    RegrasDeVaza regrasDeVaza();
+
+    /** Quanto a rodada pode valer. */
+    EscadaDeApostas escadaDeApostas();
 }

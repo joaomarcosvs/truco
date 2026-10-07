@@ -80,7 +80,7 @@ Pacotes sob o pacote base: `carta`, `regras`, `partida`, `acao`, `evento`, `visa
 - `ConfiguracaoDaPartida` (jogadores/equipes, variante, seed)
 - `EstadoDaPartida`: placar, número da rodada, carteador, seed, rodada atual
 - `Rodada`, `Vaza`, `Jogada`
-- `FaseDaRodada` (sealed): `AguardandoDescarte(jogador)`, `AguardandoJogada(jogador)`, `AguardandoRespostaDeAumento(respondedor, nivelProposto)`, `DecisaoRodadaDeOnze(jogador)`, `RodadaFinalizada`, `PartidaFinalizada`
+- `FaseDaRodada` (sealed): `AguardandoDescarte(jogador)`, `AguardandoJogada(jogador)`, `AguardandoRespostaDeAumento(respondedor, nivelProposto)`, `DecisaoRodadaDeOnze(jogador)`, `PartidaFinalizada`. O fim de uma rodada não é fase: é o evento `RodadaFinalizada`, e o mesmo `aplicar` já distribui a rodada seguinte.
 
 **API do motor**
 
@@ -191,7 +191,7 @@ O que isso exige do desenho de hoje:
 
 - [x] M1 Fundação
 - [x] M2 Cartas e força (RG-CARTAS-3 será testada no M3, junto com a distribuição)
-- [ ] M3 Rodada sem aumentos
+- [x] M3 Rodada sem aumentos (vencer com 12 pontos, de RG-PARTIDA-1, será testado no M7; correr, de RG-PARTIDA-5, no M4/M5)
 - [ ] M4 Aumentos
 - [ ] M5 Carta encoberta e correr
 - [ ] M6 Descarte
@@ -212,3 +212,9 @@ O que isso exige do desenho de hoje:
 - **M2** A variante paulista fica em `regras.paulista`. `TrucoPaulista` é um record sem componentes (todas as instâncias são iguais), e as peças são package-private, acessadas pelas interfaces. `VarianteDeRegras` só tem as peças já usadas; as outras entram nos marcos que precisarem delas.
 - **M2** A ordem de referência do baralho (A♦ A♠ A♥ A♣ 2♦ … J♣) é fixa e testada, porque o embaralhamento do M3 vai partir dela.
 - **M2** O tipo `Baralho` (monte embaralhado, com compra) e o teste de RG-CARTAS-3 (a vira é virada depois da distribuição e não é jogada) ficam para o M3, que implementa a distribuição.
+- **M3** `FaseDaRodada` não tem `RodadaFinalizada` (aprovado): como nenhuma ação leva à rodada seguinte, o `aplicar` que encerra uma rodada já distribui a próxima e devolve os eventos das duas. Os tipos sealed crescem a cada marco: hoje `Acao` só tem `JogarCarta`, `FaseDaRodada` só `AguardandoJogada`, e `Evento` tem os 7 eventos da rodada sem aumentos.
+- **M3** Embaralhamento em `partida.Sorteio`: Fisher–Yates com números de SHA-256 sobre (finalidade, seed, rodada, contador); o carteador inicial sai do mesmo gerador. Dá as mesmas cartas em qualquer JVM, e ver algumas cartas não ajuda a prever as outras. O resultado da seed 2026 está fixado em teste.
+- **M3** Distribuição: uma carta por vez, a começar pelo jogador à direita do carteador; a vira é a carta seguinte. Não foi preciso um tipo `Baralho`: o monte é `Rodada.baralhoRestante`, já embaralhado.
+- **M3** `indiceNaMao` é a posição na mão atual: ao jogar uma carta, as seguintes sobem uma posição. `aplicar` rejeita tudo o que não está em `acoesLegais` (`JOGADOR_DESCONHECIDO`, `NAO_E_A_VEZ_DO_JOGADOR` ou `ACAO_INVALIDA`); configuração inválida e `visaoDe` de quem não joga são erros de programação (`IllegalArgumentException`).
+- **M3** Todas as mudanças de fase passam por `MotorGenerico.proximaFase`, o ponto que o descarte (M6) e o envido do gaudério vão estender. `novaPartida` só aceita 1x1 (RG-ESC-1), devolve o estado com a 1ª rodada já distribuída (sem eventos) e o motor se obtém com `MotorDeTruco.novo()`.
+- **M3** Os pacotes `partida`, `regras`, `evento` e `visao` se referenciam (as regras usam `Jogada` e `Vaza`; a partida usa a variante). É intencional, por ser um módulo só.

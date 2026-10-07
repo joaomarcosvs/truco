@@ -9,6 +9,9 @@ import java.util.Optional;
  */
 public interface OrdemDeForca {
 
+    /** Se, depois da distribuição, vira-se uma carta que define a força das outras (RG-CARTAS-3 no Truco Paulista). */
+    boolean usaVira();
+
     /**
      * Força da carta na rodada: quanto maior, mais forte, e cartas de mesma força empatam. O número só serve para
      * comparar cartas da mesma rodada.

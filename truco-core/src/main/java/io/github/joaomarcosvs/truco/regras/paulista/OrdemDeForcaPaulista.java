@@ -35,6 +35,11 @@ final class OrdemDeForcaPaulista implements OrdemDeForca {
     private static final List<Naipe> NAIPES_DAS_MANILHAS = List.of(OUROS, ESPADAS, COPAS, PAUS);
 
     @Override
+    public boolean usaVira() {
+        return true; // RG-CARTAS-3 e RG-CARTAS-4: a vira define a manilha.
+    }
+
+    @Override
     public int forca(Carta carta, Optional<Carta> vira) {
         Carta cartaVirada = vira.orElseThrow(() -> new IllegalArgumentException("O Truco Paulista sempre tem vira"));
         if (carta.valor() == manilha(cartaVirada)) {
