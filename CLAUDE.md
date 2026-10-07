@@ -190,7 +190,7 @@ O que isso exige do desenho de hoje:
 ## 11. Status
 
 - [x] M1 Fundação
-- [ ] M2 Cartas e força
+- [x] M2 Cartas e força (RG-CARTAS-3 será testada no M3, junto com a distribuição)
 - [ ] M3 Rodada sem aumentos
 - [ ] M4 Aumentos
 - [ ] M5 Carta encoberta e correr
@@ -207,3 +207,8 @@ O que isso exige do desenho de hoje:
 - **M1** O enforcer barra no `truco-core` qualquer dependência fora do escopo `test` (princípio 1).
 - **M1** Formatação: Spotless com palantir-java-format (até 120 colunas), checada no `verify`. Finais de linha LF (`.gitattributes` e `.editorconfig`), exceto `*.cmd`.
 - **M1** RG-ENC-4 e RG-ONZE-3 confirmadas como `[DEFINIDA]` e serão regras fixas. Como não restou regra `[A CONFIRMAR]`, a `OpcoesTrucoPaulista` só será criada quando surgir uma.
+- **M2** `Valor` tem os 13 valores do baralho francês e `Naipe` os 4 naipes. A ordem de declaração não é ordem de força (os naipes estão em ordem alfabética para que um `compareTo` acidental quebre os testes), e `Carta` não é `Comparable`. Quais cartas existem e a força de cada uma ficam em `regras`.
+- **M2** `OrdemDeForca` expõe `forca(carta, vira)` (inteiro: maior vence, igual empata) e `comparar`, derivado dele. A vira é `Optional<Carta>`, vazia em variantes de manilhas fixas; no Truco Paulista, avaliar sem vira é erro de programação (`IllegalArgumentException`).
+- **M2** A variante paulista fica em `regras.paulista`. `TrucoPaulista` é um record sem componentes (todas as instâncias são iguais), e as peças são package-private, acessadas pelas interfaces. `VarianteDeRegras` só tem as peças já usadas; as outras entram nos marcos que precisarem delas.
+- **M2** A ordem de referência do baralho (A♦ A♠ A♥ A♣ 2♦ … J♣) é fixa e testada, porque o embaralhamento do M3 vai partir dela.
+- **M2** O tipo `Baralho` (monte embaralhado, com compra) e o teste de RG-CARTAS-3 (a vira é virada depois da distribuição e não é jogada) ficam para o M3, que implementa a distribuição.
