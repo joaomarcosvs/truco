@@ -1,6 +1,7 @@
 package io.github.joaomarcosvs.truco.visao;
 
 import io.github.joaomarcosvs.truco.carta.Carta;
+import io.github.joaomarcosvs.truco.partida.Aposta;
 import io.github.joaomarcosvs.truco.partida.Equipe;
 import io.github.joaomarcosvs.truco.partida.Jogada;
 import io.github.joaomarcosvs.truco.partida.JogadorId;
@@ -15,6 +16,7 @@ import java.util.Optional;
  * O que um jogador pode ver da partida (RG-VIS-1, RG-VIS-2): a própria mão, a vira, as cartas jogadas, o placar e o
  * andamento da rodada. Nunca as cartas dos outros nem a ordem do baralho.
  *
+ * @param aposta quanto a rodada vale, quem pode aumentar e o pedido de aumento pendente
  * @param cartasNaMao quantas cartas cada jogador tem na mão
  * @param vazas as vazas encerradas da rodada
  * @param vazaAtual as jogadas da vaza em andamento
@@ -27,7 +29,7 @@ public record VisaoDoJogador(
         Placar placar,
         int numeroDaRodada,
         JogadorId carteador,
-        int valorDaRodada,
+        Aposta aposta,
         Optional<Carta> vira,
         List<Carta> mao,
         Map<JogadorId, Integer> cartasNaMao,
@@ -41,6 +43,7 @@ public record VisaoDoJogador(
         equipes = List.copyOf(equipes);
         Objects.requireNonNull(placar, "placar");
         Objects.requireNonNull(carteador, "carteador");
+        Objects.requireNonNull(aposta, "aposta");
         Objects.requireNonNull(vira, "vira");
         mao = List.copyOf(mao);
         cartasNaMao = Map.copyOf(cartasNaMao);

@@ -3,12 +3,16 @@ package io.github.joaomarcosvs.truco.partida;
 import static io.github.joaomarcosvs.truco.carta.NotacaoDeCartas.carta;
 import static io.github.joaomarcosvs.truco.partida.Partidas.aplicarAceita;
 
+import io.github.joaomarcosvs.truco.acao.Acao;
+import io.github.joaomarcosvs.truco.acao.Aceitar;
+import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Aplica jogadas em sequência e acumula os eventos, para os testes de cenário. */
+/** Aplica ações em sequência e acumula os eventos, para os testes de cenário. Toda ação precisa ser aceita. */
 final class MesaDeTeste {
 
     private EstadoDaPartida estado;
@@ -18,14 +22,30 @@ final class MesaDeTeste {
         this.estado = estado;
     }
 
-    /** O jogador joga a carta indicada; ela precisa estar na mão dele, e o motor precisa aceitar. */
+    /** O jogador joga a carta indicada, que precisa estar na mão dele. */
     MesaDeTeste jogar(JogadorId jogador, String notacao) {
         int indice = estado.rodada().maoDe(jogador).indexOf(carta(notacao));
         if (indice < 0) {
             throw new AssertionError(jogador + " não tem " + notacao + " na mão: "
                     + estado.rodada().maoDe(jogador));
         }
-        Aplicada aplicada = aplicarAceita(estado, jogador, new JogarCarta(indice));
+        return agir(jogador, new JogarCarta(indice));
+    }
+
+    MesaDeTeste pedirAumento(JogadorId jogador) {
+        return agir(jogador, new PedirAumento());
+    }
+
+    MesaDeTeste aceitar(JogadorId jogador) {
+        return agir(jogador, new Aceitar());
+    }
+
+    MesaDeTeste correr(JogadorId jogador) {
+        return agir(jogador, new Correr());
+    }
+
+    MesaDeTeste agir(JogadorId jogador, Acao acao) {
+        Aplicada aplicada = aplicarAceita(estado, jogador, acao);
         estado = aplicada.novoEstado();
         eventos.addAll(aplicada.eventos());
         return this;

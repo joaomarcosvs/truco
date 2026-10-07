@@ -4,8 +4,11 @@ import io.github.joaomarcosvs.truco.partida.JogadorId;
 
 /** Algo que aconteceu na partida, com a indicação de quem pode vê-lo (RG-VIS-1, RG-VIS-2). */
 public sealed interface Evento
-        permits CartaJogada,
+        permits AumentoAceito,
+                AumentoPedido,
+                CartaJogada,
                 CartasDistribuidas,
+                JogadorCorreu,
                 PlacarAtualizado,
                 RodadaAnulada,
                 RodadaFinalizada,

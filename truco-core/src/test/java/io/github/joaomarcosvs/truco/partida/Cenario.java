@@ -55,7 +55,8 @@ final class Cenario {
                 .filter(carta -> !usadas.contains(carta))
                 .toList();
         FaseDaRodada fase = new FaseDaRodada.AguardandoJogada(configuracao.aDireitaDe(carteador));
-        Rodada rodada = new Rodada(1, Optional.of(vira), maos, baralhoRestante, List.of(), List.of(), fase);
+        Rodada rodada =
+                new Rodada(Aposta.inicial(1), Optional.of(vira), maos, baralhoRestante, List.of(), List.of(), fase);
         return new EstadoDaPartida(configuracao, Placar.zerado(configuracao.equipes()), 1, carteador, rodada);
     }
 }

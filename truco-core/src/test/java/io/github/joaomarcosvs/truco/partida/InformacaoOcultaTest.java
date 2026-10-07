@@ -32,7 +32,7 @@ class InformacaoOcultaTest {
         assertThat(visao.placar()).isEqualTo(estado.placar());
         assertThat(visao.numeroDaRodada()).isEqualTo(1);
         assertThat(visao.carteador()).isEqualTo(estado.carteador());
-        assertThat(visao.valorDaRodada()).isEqualTo(1);
+        assertThat(visao.aposta()).isEqualTo(Aposta.inicial(1));
         assertThat(visao.vezDe()).contains(estado.configuracao().aDireitaDe(estado.carteador()));
         assertThat(visao.cartasNaMao()).containsOnly(entry(ANA, 3), entry(BETO, 3));
         assertThat(visao.jogadoresNaOrdemDaMesa()).containsExactly(ANA, BETO);

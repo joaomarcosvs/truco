@@ -12,7 +12,10 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.daVez;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
+import io.github.joaomarcosvs.truco.acao.Aceitar;
+import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.RodadaIniciada;
@@ -36,6 +39,20 @@ class PartidaAleatoriaPropriedadesTest {
     private static final List<Carta> BARALHO =
             new TrucoPaulista().composicaoDoBaralho().cartas();
 
+    /** Todas as ações possíveis com até 3 cartas na mão, além de posições que nunca existem. */
+    private static final List<Acao> TODAS_AS_ACOES = List.of(
+            new JogarCarta(-1),
+            new JogarCarta(0),
+            new JogarCarta(1),
+            new JogarCarta(2),
+            new JogarCarta(3),
+            new PedirAumento(),
+            new Aceitar(),
+            new Correr());
+
+    /** RG-AUM-1, copiada do documento de regras. */
+    private static final Set<Integer> ESCADA = Set.of(1, 3, 6, 9, 12);
+
     /** Um passo da partida: o estado antes, quem agiu, a ação e o que o motor devolveu. */
     private record Passo(EstadoDaPartida antes, JogadorId jogador, Acao acao, Aplicada aplicada) {}
 
@@ -55,8 +72,7 @@ class PartidaAleatoriaPropriedadesTest {
         for (Passo passo : jogar(seed, escolhas)) {
             for (JogadorId jogador : List.of(ANA, BETO)) {
                 List<Acao> legais = MOTOR.acoesLegais(passo.antes(), jogador);
-                for (int indiceNaMao = -1; indiceNaMao <= 3; indiceNaMao++) {
-                    Acao acao = new JogarCarta(indiceNaMao);
+                for (Acao acao : TODAS_AS_ACOES) {
                     Resultado resultado = MOTOR.aplicar(passo.antes(), jogador, acao);
                     assertThat(resultado)
                             .as("%s tentando %s", jogador, acao)
@@ -107,15 +123,25 @@ class PartidaAleatoriaPropriedadesTest {
     }
 
     @Property
+    @Label("RG-AUM-1: o valor da rodada e o nível pedido estão sempre na escada de apostas")
+    void valorSempreNaEscada(@ForAll long seed, @ForAll("escolhas") List<Integer> escolhas) {
+        for (Passo passo : jogar(seed, escolhas)) {
+            Aposta aposta = passo.aplicada().novoEstado().rodada().aposta();
+            assertThat(ESCADA).contains(aposta.valor());
+            aposta.pedidoPendente().ifPresent(pedido -> assertThat(ESCADA).contains(pedido.nivelProposto()));
+        }
+    }
+
+    @Property
     @Label("Determinismo: a mesma seed com as mesmas ações gera a mesma partida, com os mesmos eventos")
     void deterministica(@ForAll long seed, @ForAll("escolhas") List<Integer> escolhas) {
         assertThat(jogar(seed, escolhas)).isEqualTo(jogar(seed, escolhas));
     }
 
-    /** Qual das ações legais cada jogador escolhe, passo a passo. */
+    /** Qual das ações legais cada jogador escolhe, passo a passo (o resto da divisão pelo número de ações legais). */
     @Provide
     Arbitrary<List<Integer>> escolhas() {
-        return Arbitraries.integers().between(0, 2).list().ofMaxSize(80);
+        return Arbitraries.integers().between(0, 99).list().ofMaxSize(80);
     }
 
     /** A carta que a ação tornou pública. */
@@ -123,6 +149,9 @@ class PartidaAleatoriaPropriedadesTest {
         return switch (passo.acao()) {
             case JogarCarta(int indiceNaMao) ->
                 Optional.of(passo.antes().rodada().maoDe(passo.jogador()).get(indiceNaMao));
+            case PedirAumento pedido -> Optional.empty();
+            case Aceitar aceite -> Optional.empty();
+            case Correr corrida -> Optional.empty();
         };
     }
 

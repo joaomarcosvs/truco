@@ -192,7 +192,7 @@ O que isso exige do desenho de hoje:
 - [x] M1 Fundação
 - [x] M2 Cartas e força (RG-CARTAS-3 será testada no M3, junto com a distribuição)
 - [x] M3 Rodada sem aumentos (vencer com 12 pontos, de RG-PARTIDA-1, será testado no M7; correr, de RG-PARTIDA-5, no M4/M5)
-- [ ] M4 Aumentos
+- [x] M4 Aumentos (correr na própria vez, de RG-AUM-6, entra no M5; as exceções de RG-AUM-7 e "rodada de 12 vence a partida", de RG-AUM-1, no M7)
 - [ ] M5 Carta encoberta e correr
 - [ ] M6 Descarte
 - [ ] M7 Partida completa
@@ -218,3 +218,6 @@ O que isso exige do desenho de hoje:
 - **M3** `indiceNaMao` é a posição na mão atual: ao jogar uma carta, as seguintes sobem uma posição. `aplicar` rejeita tudo o que não está em `acoesLegais` (`JOGADOR_DESCONHECIDO`, `NAO_E_A_VEZ_DO_JOGADOR` ou `ACAO_INVALIDA`); configuração inválida e `visaoDe` de quem não joga são erros de programação (`IllegalArgumentException`).
 - **M3** Todas as mudanças de fase passam por `MotorGenerico.proximaFase`, o ponto que o descarte (M6) e o envido do gaudério vão estender. `novaPartida` só aceita 1x1 (RG-ESC-1), devolve o estado com a 1ª rodada já distribuída (sem eventos) e o motor se obtém com `MotorDeTruco.novo()`.
 - **M3** Os pacotes `partida`, `regras`, `evento` e `visao` se referenciam (as regras usam `Jogada` e `Vaza`; a partida usa a variante). É intencional, por ser um módulo só.
+- **M4** `Aposta` (valor, equipe que aceitou o último aumento e pedido pendente) substitui o `valor` da `Rodada` e vai inteira na `VisaoDoJogador`, porque é pública. A fase `AguardandoRespostaDeAumento(respondedor, nivelProposto)` sai do pedido pendente, em `proximaFase`. `Acao` ganhou `PedirAumento`, `Aceitar` e `Correr`; `Evento` ganhou `AumentoPedido`, `AumentoAceito` e `JogadorCorreu`.
+- **M4** `EscadaDeApostas` tem `proximoNivel`, `valorAoCorrer` e `podeAumentar` (teto e direito de aumentar). O motor só registra quem aceitou; a regra de quem pode pedir fica na escada.
+- **M4** Responde a um pedido o adversário à direita de quem pediu; num "pedir mais", responde quem tinha pedido, e o motor emite `AumentoAceito` e `AumentoPedido`. Aceito o aumento, a vez volta para quem ia jogar, que pode pedir o nível seguinte na hora se tiver o direito. `Correr` por enquanto só responde a um pedido.

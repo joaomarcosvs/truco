@@ -9,11 +9,11 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A rodada em andamento (RG-PARTIDA-2): quanto vale, a vira, as mãos, o baralho restante, as vazas encerradas, as
- * jogadas da vaza em andamento e a fase. Contém informação oculta, então só o servidor a enxerga.
+ * A rodada em andamento (RG-PARTIDA-2): a aposta, a vira, as mãos, o baralho restante, as vazas encerradas, as jogadas
+ * da vaza em andamento e a fase. Contém informação oculta, então só o servidor a enxerga.
  */
 public record Rodada(
-        int valor,
+        Aposta aposta,
         Optional<Carta> vira,
         Map<JogadorId, List<Carta>> maos,
         List<Carta> baralhoRestante,
@@ -22,9 +22,7 @@ public record Rodada(
         FaseDaRodada fase) {
 
     public Rodada {
-        if (valor < 1) {
-            throw new IllegalArgumentException("A rodada vale pelo menos 1 ponto: " + valor);
-        }
+        Objects.requireNonNull(aposta, "aposta");
         Objects.requireNonNull(vira, "vira");
         maos = maos.entrySet().stream()
                 .collect(toUnmodifiableMap(Map.Entry::getKey, entrada -> List.copyOf(entrada.getValue())));

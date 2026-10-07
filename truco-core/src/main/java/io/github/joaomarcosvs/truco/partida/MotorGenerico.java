@@ -4,17 +4,25 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
+import io.github.joaomarcosvs.truco.acao.Aceitar;
+import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
+import io.github.joaomarcosvs.truco.evento.AumentoAceito;
+import io.github.joaomarcosvs.truco.evento.AumentoPedido;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
 import io.github.joaomarcosvs.truco.evento.Evento;
+import io.github.joaomarcosvs.truco.evento.JogadorCorreu;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
 import io.github.joaomarcosvs.truco.evento.RodadaAnulada;
 import io.github.joaomarcosvs.truco.evento.RodadaFinalizada;
 import io.github.joaomarcosvs.truco.evento.RodadaIniciada;
 import io.github.joaomarcosvs.truco.evento.VazaFinalizada;
 import io.github.joaomarcosvs.truco.partida.FaseDaRodada.AguardandoJogada;
+import io.github.joaomarcosvs.truco.partida.FaseDaRodada.AguardandoRespostaDeAumento;
+import io.github.joaomarcosvs.truco.regras.EscadaDeApostas;
 import io.github.joaomarcosvs.truco.regras.RegrasDeVaza;
 import io.github.joaomarcosvs.truco.regras.VarianteDeRegras;
 import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
@@ -25,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.IntStream;
 
 /** Motor genérico: todas as regras vêm da variante da configuração (CLAUDE.md, seção 7). */
 final class MotorGenerico implements MotorDeTruco {
@@ -41,15 +48,35 @@ final class MotorGenerico implements MotorDeTruco {
 
     @Override
     public List<Acao> acoesLegais(EstadoDaPartida estado, JogadorId jogador) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        EscadaDeApostas escada = configuracao.variante().escadaDeApostas();
         Rodada rodada = estado.rodada();
-        return switch (rodada.fase()) {
-            case AguardandoJogada(JogadorId daVez)
-            when daVez.equals(jogador) ->
-                IntStream.range(0, rodada.maoDe(jogador).size())
-                        .<Acao>mapToObj(JogarCarta::new)
-                        .toList();
-            case AguardandoJogada outroJogador -> List.of();
-        };
+        List<Acao> acoes = new ArrayList<>();
+        switch (rodada.fase()) {
+            case AguardandoJogada aguardando
+            when aguardando.jogador().equals(jogador) -> {
+                for (int indiceNaMao = 0; indiceNaMao < rodada.maoDe(jogador).size(); indiceNaMao++) {
+                    acoes.add(new JogarCarta(indiceNaMao));
+                }
+                // RG-AUM-2 e RG-AUM-5: na sua vez, antes de jogar, quem tem o direito pode pedir aumento.
+                if (escada.podeAumentar(rodada.aposta(), configuracao.equipeDe(jogador))) {
+                    acoes.add(new PedirAumento());
+                }
+            }
+            case AguardandoRespostaDeAumento resposta
+            when resposta.respondedor().equals(jogador) -> {
+                acoes.add(new Aceitar());
+                acoes.add(new Correr());
+                // RG-AUM-3: pedir mais é aceitar o pedido e já propor o nível seguinte, se houver.
+                EquipeId equipe = configuracao.equipeDe(jogador);
+                if (escada.podeAumentar(aceita(rodada.aposta(), equipe), equipe)) {
+                    acoes.add(new PedirAumento());
+                }
+            }
+            case AguardandoJogada outroJogador -> {}
+            case AguardandoRespostaDeAumento outroJogador -> {}
+        }
+        return List.copyOf(acoes);
     }
 
     @Override
@@ -66,6 +93,9 @@ final class MotorGenerico implements MotorDeTruco {
         List<Evento> eventos = new ArrayList<>();
         EstadoDaPartida novoEstado = switch (acao) {
             case JogarCarta(int indiceNaMao) -> jogarCarta(estado, jogador, indiceNaMao, eventos);
+            case PedirAumento pedido -> pedirAumento(estado, jogador, eventos);
+            case Aceitar aceite -> aceitarAumento(estado, jogador, eventos);
+            case Correr corrida -> correr(estado, jogador, eventos);
         };
         return new Aplicada(novoEstado, eventos);
     }
@@ -82,6 +112,7 @@ final class MotorGenerico implements MotorDeTruco {
                 .collect(toMap(identity(), outro -> rodada.maoDe(outro).size()));
         Optional<JogadorId> vezDe = switch (rodada.fase()) {
             case AguardandoJogada(JogadorId daVez) -> Optional.of(daVez);
+            case AguardandoRespostaDeAumento resposta -> Optional.of(resposta.respondedor());
         };
         return new VisaoDoJogador(
                 jogador,
@@ -90,7 +121,7 @@ final class MotorGenerico implements MotorDeTruco {
                 estado.placar(),
                 estado.numeroDaRodada(),
                 estado.carteador(),
-                rodada.valor(),
+                rodada.aposta(),
                 rodada.vira(),
                 rodada.maoDe(jogador),
                 cartasNaMao,
@@ -123,28 +154,95 @@ final class MotorGenerico implements MotorDeTruco {
                 return encerrarRodada(estado, desfecho.get(), eventos);
             }
         }
-        FaseDaRodada fase = proximaFase(configuracao, estado.carteador(), vazas, vazaAtual);
+        FaseDaRodada fase = proximaFase(configuracao, estado.carteador(), rodada.aposta(), vazas, vazaAtual);
         Rodada novaRodada =
-                new Rodada(rodada.valor(), rodada.vira(), maos, rodada.baralhoRestante(), vazas, vazaAtual, fase);
+                new Rodada(rodada.aposta(), rodada.vira(), maos, rodada.baralhoRestante(), vazas, vazaAtual, fase);
         return new EstadoDaPartida(
                 configuracao, estado.placar(), estado.numeroDaRodada(), estado.carteador(), novaRodada);
     }
 
+    private static EstadoDaPartida pedirAumento(EstadoDaPartida estado, JogadorId jogador, List<Evento> eventos) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        Aposta aposta = estado.rodada().aposta();
+        Optional<PedidoDeAumento> pendente = aposta.pedidoPendente();
+        if (pendente.isPresent()) {
+            // RG-AUM-3: pedir mais é aceitar o pedido pendente e propor o nível seguinte.
+            aposta = aceita(aposta, configuracao.equipeDe(jogador));
+            eventos.add(new AumentoAceito(jogador, aposta.valor()));
+        }
+        // Responde o adversário à direita; num "pedir mais", responde quem tinha pedido.
+        JogadorId respondedor =
+                pendente.map(PedidoDeAumento::pedinte).orElseGet(() -> configuracao.aDireitaDe(jogador));
+        int nivel = configuracao
+                .variante()
+                .escadaDeApostas()
+                .proximoNivel(aposta.valor())
+                .orElseThrow();
+        eventos.add(new AumentoPedido(jogador, nivel));
+        PedidoDeAumento pedido = new PedidoDeAumento(jogador, respondedor, nivel);
+        return comAposta(estado, new Aposta(aposta.valor(), aposta.ultimaEquipeQueAceitou(), Optional.of(pedido)));
+    }
+
+    private static EstadoDaPartida aceitarAumento(EstadoDaPartida estado, JogadorId jogador, List<Evento> eventos) {
+        Aposta aceita = aceita(estado.rodada().aposta(), estado.configuracao().equipeDe(jogador));
+        eventos.add(new AumentoAceito(jogador, aceita.valor()));
+        return comAposta(estado, aceita);
+    }
+
+    private static EstadoDaPartida correr(EstadoDaPartida estado, JogadorId jogador, List<Evento> eventos) {
+        PedidoDeAumento pedido = estado.rodada().aposta().pedidoPendente().orElseThrow();
+        eventos.add(new JogadorCorreu(jogador));
+        // RG-AUM-3 e RG-AUM-4: quem pediu ganha o valor que a rodada tinha antes do pedido.
+        int pontos = estado.configuracao().variante().escadaDeApostas().valorAoCorrer(pedido.nivelProposto());
+        return darVitoria(estado, estado.configuracao().equipeDe(pedido.pedinte()), pontos, eventos);
+    }
+
+    /**
+     * A aposta depois de aceito o pedido pendente: a rodada vale o nível pedido, e fica registrado quem aceitou, que é
+     * quem a escada consulta para saber quem pode aumentar (RG-AUM-3, RG-AUM-5).
+     */
+    private static Aposta aceita(Aposta aposta, EquipeId quemAceitou) {
+        PedidoDeAumento pedido = aposta.pedidoPendente().orElseThrow();
+        return new Aposta(pedido.nivelProposto(), Optional.of(quemAceitou), Optional.empty());
+    }
+
+    private static EstadoDaPartida comAposta(EstadoDaPartida estado, Aposta aposta) {
+        Rodada rodada = estado.rodada();
+        FaseDaRodada fase =
+                proximaFase(estado.configuracao(), estado.carteador(), aposta, rodada.vazas(), rodada.vazaAtual());
+        Rodada novaRodada = new Rodada(
+                aposta,
+                rodada.vira(),
+                rodada.maos(),
+                rodada.baralhoRestante(),
+                rodada.vazas(),
+                rodada.vazaAtual(),
+                fase);
+        return new EstadoDaPartida(
+                estado.configuracao(), estado.placar(), estado.numeroDaRodada(), estado.carteador(), novaRodada);
+    }
+
     private static EstadoDaPartida encerrarRodada(
             EstadoDaPartida estado, DesfechoDaRodada desfecho, List<Evento> eventos) {
-        int valor = estado.rodada().valor();
-        Placar placar = switch (desfecho) {
-            case DesfechoDaRodada.Vitoria(EquipeId equipe) -> {
-                Placar atualizado = estado.placar().somando(equipe, valor);
-                eventos.add(new RodadaFinalizada(estado.numeroDaRodada(), equipe, valor));
-                eventos.add(new PlacarAtualizado(atualizado));
-                yield atualizado;
-            }
+        return switch (desfecho) {
+            case DesfechoDaRodada.Vitoria(EquipeId equipe) ->
+                darVitoria(estado, equipe, estado.rodada().aposta().valor(), eventos);
             case DesfechoDaRodada.Anulada anulada -> {
                 eventos.add(new RodadaAnulada(estado.numeroDaRodada())); // RG-EMP-5: ninguém pontua.
-                yield estado.placar();
+                yield proximaRodada(estado, estado.placar(), eventos);
             }
         };
+    }
+
+    private static EstadoDaPartida darVitoria(
+            EstadoDaPartida estado, EquipeId equipe, int pontos, List<Evento> eventos) {
+        Placar placar = estado.placar().somando(equipe, pontos);
+        eventos.add(new RodadaFinalizada(estado.numeroDaRodada(), equipe, pontos));
+        eventos.add(new PlacarAtualizado(placar));
+        return proximaRodada(estado, placar, eventos);
+    }
+
+    private static EstadoDaPartida proximaRodada(EstadoDaPartida estado, Placar placar, List<Evento> eventos) {
         // RG-PARTIDA-4: o carteador passa para o jogador à direita.
         JogadorId carteador = estado.configuracao().aDireitaDe(estado.carteador());
         return iniciarRodada(estado.configuracao(), placar, estado.numeroDaRodada() + 1, carteador, eventos);
@@ -173,23 +271,33 @@ final class MotorGenerico implements MotorDeTruco {
         // RG-CARTAS-3: depois de distribuir, vira-se a carta seguinte do baralho.
         Optional<Carta> vira =
                 variante.ordemDeForca().usaVira() ? Optional.of(baralho.get(proxima++)) : Optional.empty();
-        int valor = variante.escadaDeApostas().valorInicial(); // RG-PARTIDA-3
+        Aposta aposta = Aposta.inicial(variante.escadaDeApostas().valorInicial()); // RG-PARTIDA-3
 
-        eventos.add(new RodadaIniciada(numeroDaRodada, carteador, valor, vira));
+        eventos.add(new RodadaIniciada(numeroDaRodada, carteador, aposta.valor(), vira));
         ordem.forEach(jogador -> eventos.add(new CartasDistribuidas(jogador, maos.get(jogador))));
 
-        FaseDaRodada fase = proximaFase(configuracao, carteador, List.of(), List.of());
+        FaseDaRodada fase = proximaFase(configuracao, carteador, aposta, List.of(), List.of());
         Rodada rodada =
-                new Rodada(valor, vira, maos, baralho.subList(proxima, baralho.size()), List.of(), List.of(), fase);
+                new Rodada(aposta, vira, maos, baralho.subList(proxima, baralho.size()), List.of(), List.of(), fase);
         return new EstadoDaPartida(configuracao, placar, numeroDaRodada, carteador, rodada);
     }
 
     /**
-     * Ponto único que decide a fase seguinte (CLAUDE.md, seção 7): com uma vaza em andamento, joga quem está à direita
-     * do último; no começo da rodada, quem está à direita do carteador; depois de uma vaza, quem a variante indicar.
+     * Ponto único que decide a fase seguinte (CLAUDE.md, seção 7): com um pedido de aumento pendente, responde o
+     * pedido; com uma vaza em andamento, joga quem está à direita do último; no começo da rodada, quem está à direita do
+     * carteador; depois de uma vaza, quem a variante indicar.
      */
     private static FaseDaRodada proximaFase(
-            ConfiguracaoDaPartida configuracao, JogadorId carteador, List<Vaza> vazas, List<Jogada> vazaAtual) {
+            ConfiguracaoDaPartida configuracao,
+            JogadorId carteador,
+            Aposta aposta,
+            List<Vaza> vazas,
+            List<Jogada> vazaAtual) {
+        Optional<PedidoDeAumento> pendente = aposta.pedidoPendente();
+        if (pendente.isPresent()) {
+            return new AguardandoRespostaDeAumento(
+                    pendente.get().respondedor(), pendente.get().nivelProposto()); // RG-AUM-3
+        }
         if (!vazaAtual.isEmpty()) {
             return new AguardandoJogada(
                     configuracao.aDireitaDe(vazaAtual.getLast().jogador())); // RG-VAZA-1

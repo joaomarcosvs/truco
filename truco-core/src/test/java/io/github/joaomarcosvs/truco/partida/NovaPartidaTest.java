@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.regras.paulista.TrucoPaulista;
 import java.util.List;
@@ -51,12 +52,12 @@ class NovaPartidaTest {
     }
 
     @Test
-    @DisplayName("RG-CARTAS-3: a vira não é jogada: as ações são só as posições da mão")
+    @DisplayName("RG-CARTAS-3: a vira não é jogada: só as posições da mão viram jogadas")
     void viraNaoEJogada() {
         JogadorId daVez = configuracao.aDireitaDe(estado.carteador());
 
         assertThat(MOTOR.acoesLegais(estado, daVez))
-                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2));
+                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2), new PedirAumento());
     }
 
     @Test
@@ -76,7 +77,7 @@ class NovaPartidaTest {
     @Test
     @DisplayName("RG-PARTIDA-3: a rodada começa valendo 1 ponto")
     void valeUmPonto() {
-        assertThat(rodada.valor()).isEqualTo(1);
+        assertThat(rodada.aposta()).isEqualTo(Aposta.inicial(1));
     }
 
     @Test
