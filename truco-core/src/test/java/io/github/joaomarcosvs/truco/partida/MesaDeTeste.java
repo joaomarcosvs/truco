@@ -6,9 +6,11 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.aplicarAceita;
 import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.acao.Aceitar;
 import io.github.joaomarcosvs.truco.acao.Correr;
+import io.github.joaomarcosvs.truco.acao.Descartar;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
+import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,15 @@ final class MesaDeTeste {
     /** O jogador joga encoberta a carta indicada, que precisa estar na mão dele. */
     MesaDeTeste jogarEncoberta(JogadorId jogador, String notacao) {
         return agir(jogador, new JogarEncoberta(posicaoNaMao(jogador, notacao)));
+    }
+
+    /** O jogador descarta a carta indicada, que precisa ser a carta da vez e estar na mão dele. */
+    MesaDeTeste descartar(JogadorId jogador, String notacao) {
+        return agir(jogador, new Descartar(posicaoNaMao(jogador, notacao)));
+    }
+
+    MesaDeTeste recusarDescarte(JogadorId jogador) {
+        return agir(jogador, new RecusarDescarte());
     }
 
     MesaDeTeste pedirAumento(JogadorId jogador) {

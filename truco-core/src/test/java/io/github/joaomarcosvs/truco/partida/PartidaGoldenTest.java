@@ -6,18 +6,21 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.MOTOR;
 import static io.github.joaomarcosvs.truco.partida.Partidas.aplicarAceita;
 import static io.github.joaomarcosvs.truco.partida.Partidas.configuracao;
 import static io.github.joaomarcosvs.truco.partida.Partidas.daVez;
+import static io.github.joaomarcosvs.truco.partida.Partidas.primeiraAcaoLegal;
 import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
-import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.AumentoAceito;
 import io.github.joaomarcosvs.truco.evento.AumentoPedido;
+import io.github.joaomarcosvs.truco.evento.CartaDescartada;
 import io.github.joaomarcosvs.truco.evento.CartaEncobertaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
+import io.github.joaomarcosvs.truco.evento.CartaRecebidaPorDescarte;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
+import io.github.joaomarcosvs.truco.evento.DescarteEncerrado;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.JogadorCorreu;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
@@ -39,21 +42,25 @@ import org.junit.jupiter.api.Test;
 class PartidaGoldenTest {
 
     @Test
-    @DisplayName("Seed 2026, cada jogador sempre joga a primeira carta da mão: eventos até o início da 4ª rodada")
+    @DisplayName(
+            "Seed 2026, cada jogador sempre faz a primeira ação legal (descarta quando pode e joga a primeira carta):"
+                    + " eventos até o início da 4ª rodada")
     void tresRodadas() {
         EstadoDaPartida estado = MOTOR.novaPartida(configuracao(2026));
         List<String> linhas = new ArrayList<>(inicio(estado));
         while (estado.numeroDaRodada() <= 3) {
-            Aplicada aplicada = aplicarAceita(estado, daVez(estado), new JogarCarta(0));
+            Aplicada aplicada = primeiraAcaoLegal(estado);
             aplicada.eventos().forEach(evento -> linhas.add(descrever(evento)));
             estado = aplicada.novoEstado();
         }
 
-        // Manilhas: J na rodada 1 (vira Q♦), 2 na rodada 2 (vira A♠) e 7 na rodada 3 (vira 6♣).
+        // Manilhas: J na rodada 1 (vira Q♦), 2 na rodada 2 (vira A♠) e 7 na rodada 3 (vira 6♣). Em nenhuma
+        // rodada alguém tem o 4♦, a primeira carta da sequência, então o descarte termina sem descartes.
         assertThat(String.join("\n", linhas)).isEqualTo("""
                         rodada 1: ana dá as cartas, vale 1, vira Q♦
                         beto recebe 5♥ 10♣ 7♦
                         ana recebe 2♣ 3♣ J♦
+                        descarte encerrado
                         beto joga 5♥
                         ana joga 2♣
                         vaza 1: ana vence
@@ -65,6 +72,7 @@ class PartidaGoldenTest {
                         rodada 2: beto dá as cartas, vale 1, vira A♠
                         ana recebe 5♥ 2♦ J♥
                         beto recebe 2♠ 7♠ 3♣
+                        descarte encerrado
                         ana joga 5♥
                         beto joga 2♠
                         vaza 1: beto vence
@@ -79,6 +87,7 @@ class PartidaGoldenTest {
                         rodada 3: ana dá as cartas, vale 1, vira 6♣
                         beto recebe 10♠ 4♠ 10♣
                         ana recebe 3♠ 2♥ 3♣
+                        descarte encerrado
                         beto joga 10♠
                         ana joga 3♠
                         vaza 1: ana vence
@@ -111,6 +120,7 @@ class PartidaGoldenTest {
                         rodada 1: ana dá as cartas, vale 1, vira Q♦
                         beto recebe 5♥ 10♣ 7♦
                         ana recebe 2♣ 3♣ J♦
+                        descarte encerrado
                         beto pede 3
                         ana aceita, a rodada vale 3
                         ana pede 6
@@ -124,6 +134,7 @@ class PartidaGoldenTest {
                         rodada 2: beto dá as cartas, vale 1, vira A♠
                         ana recebe 5♥ 2♦ J♥
                         beto recebe 2♠ 7♠ 3♣
+                        descarte encerrado
                         ana pede 3
                         beto aceita, a rodada vale 3
                         beto pede 6
@@ -170,6 +181,9 @@ class PartidaGoldenTest {
                                         .collect(joining(" ")));
             case CartaJogada jogada -> "%s joga %s".formatted(jogada.jogador(), jogada.carta());
             case CartaEncobertaJogada encoberta -> "%s joga encoberta".formatted(encoberta.jogador());
+            case CartaDescartada descartada -> "%s descarta %s".formatted(descartada.jogador(), descartada.carta());
+            case CartaRecebidaPorDescarte recebida -> "%s compra %s".formatted(recebida.jogador(), recebida.carta());
+            case DescarteEncerrado encerrado -> "descarte encerrado";
             case VazaFinalizada vaza ->
                 "vaza %d: %s"
                         .formatted(

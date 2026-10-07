@@ -11,14 +11,17 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * O que um jogador pode ver da partida (RG-VIS-1, RG-VIS-2): a própria mão, a vira, as cartas jogadas, o placar e o
- * andamento da rodada. Nunca as cartas dos outros nem a ordem do baralho.
+ * O que um jogador pode ver da partida (RG-VIS-1, RG-VIS-2): a própria mão, a vira, as cartas descartadas e jogadas, o
+ * placar e o andamento da rodada. Nunca as cartas dos outros, a ordem do baralho nem quem tem a carta da vez no
+ * descarte.
  *
  * @param aposta quanto a rodada vale, quem pode aumentar e o pedido de aumento pendente
+ * @param descartadas as cartas descartadas na rodada, que são públicas (RG-DESC-8)
+ * @param cartaDaVezNoDescarte a carta da vez, durante a fase de descarte
  * @param cartasNaMao quantas cartas cada jogador tem na mão
  * @param vazas as vazas encerradas da rodada, sem as cartas encobertas dos outros
  * @param vazaAtual as jogadas da vaza em andamento, sem as cartas encobertas dos outros
- * @param vezDe de quem se espera a próxima ação, quando isso é público
+ * @param vezDe de quem se espera a próxima ação, quando isso é público; no descarte, todos decidem
  */
 public record VisaoDoJogador(
         JogadorId jogador,
@@ -29,6 +32,8 @@ public record VisaoDoJogador(
         JogadorId carteador,
         Aposta aposta,
         Optional<Carta> vira,
+        List<Carta> descartadas,
+        Optional<Carta> cartaDaVezNoDescarte,
         List<Carta> mao,
         Map<JogadorId, Integer> cartasNaMao,
         List<VazaVisivel> vazas,
@@ -43,6 +48,8 @@ public record VisaoDoJogador(
         Objects.requireNonNull(carteador, "carteador");
         Objects.requireNonNull(aposta, "aposta");
         Objects.requireNonNull(vira, "vira");
+        descartadas = List.copyOf(descartadas);
+        Objects.requireNonNull(cartaDaVezNoDescarte, "cartaDaVezNoDescarte");
         mao = List.copyOf(mao);
         cartasNaMao = Map.copyOf(cartasNaMao);
         vazas = List.copyOf(vazas);

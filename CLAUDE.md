@@ -80,7 +80,7 @@ Pacotes sob o pacote base: `carta`, `regras`, `partida`, `acao`, `evento`, `visa
 - `ConfiguracaoDaPartida` (jogadores/equipes, variante, seed)
 - `EstadoDaPartida`: placar, número da rodada, carteador, seed, rodada atual
 - `Rodada`, `Vaza`, `Jogada`
-- `FaseDaRodada` (sealed): `AguardandoDescarte(jogador)`, `AguardandoJogada(jogador)`, `AguardandoRespostaDeAumento(respondedor, nivelProposto)`, `DecisaoRodadaDeOnze(jogador)`, `PartidaFinalizada`. O fim de uma rodada não é fase: é o evento `RodadaFinalizada`, e o mesmo `aplicar` já distribui a rodada seguinte.
+- `FaseDaRodada` (sealed): `AguardandoDescarte(cartaDaVez)`, `AguardandoJogada(jogador)`, `AguardandoRespostaDeAumento(respondedor, nivelProposto)`, `DecisaoRodadaDeOnze(jogador)`, `PartidaFinalizada`. O fim de uma rodada não é fase: é o evento `RodadaFinalizada`, e o mesmo `aplicar` já distribui a rodada seguinte.
 
 **API do motor**
 
@@ -102,7 +102,7 @@ public sealed interface Acao permits JogarCarta, JogarEncoberta, Descartar, Recu
 
 **Ações** (todas referenciam a carta pela posição na mão, `indiceNaMao`, porque na Rodada Escurinho o jogador joga sem ver)
 - `JogarCarta(indiceNaMao)`, `JogarEncoberta(indiceNaMao)`
-- `Descartar(indiceNaMao)`, `RecusarDescarte()`: só na fase de descarte, e só para quem tem a carta da vez.
+- `Descartar(indiceNaMao)`, `RecusarDescarte()`: só na fase de descarte. Todos respondem a cada carta da vez: só o dono dela pode `Descartar`, e para os outros `RecusarDescarte` é passar. O passo só se resolve quando todos responderam (RG-DESC-10).
 - `PedirAumento()`: o nível é sempre o próximo da escada. Se houver pedido pendente, significa "aceito e aumento".
 - `Aceitar()`: aceita um aumento ou, na Rodada de Onze, decide jogar.
 - `Correr()`: recusa um aumento, desiste da rodada na própria vez ou, na Rodada de Onze, decide correr.
@@ -194,7 +194,7 @@ O que isso exige do desenho de hoje:
 - [x] M3 Rodada sem aumentos (vencer com 12 pontos, de RG-PARTIDA-1, será testado no M7; correr, de RG-PARTIDA-5, no M4/M5)
 - [x] M4 Aumentos (correr na própria vez, de RG-AUM-6, entra no M5; as exceções de RG-AUM-7 e "rodada de 12 vence a partida", de RG-AUM-1, no M7)
 - [x] M5 Carta encoberta e correr (a proibição de encoberta na Rodada Escurinho entra no M7)
-- [ ] M6 Descarte
+- [x] M6 Descarte (RG-DESC-9, sem descarte na Rodada Escurinho, e o descarte na Rodada de Onze entram no M7)
 - [ ] M7 Partida completa
 - [ ] M8 Jogável (bots + CLI)
 - [ ] M9 Protocolo
@@ -224,3 +224,7 @@ O que isso exige do desenho de hoje:
 - **M5** `Jogada` ganhou `encoberta` (fábricas `Jogada.aberta` e `Jogada.encoberta`), e o estado do servidor guarda a carta encoberta. `Acao` ganhou `JogarEncoberta`; `Evento` ganhou `CartaEncobertaJogada`, sem a carta. `RegrasDeVaza.permiteEncoberta(numeroDaVaza)` libera a encoberta da 2ª vaza em diante, e o resultado da vaza só compara as cartas abertas (todas encobertas: empate).
 - **M5** A `VisaoDoJogador` não expõe mais `Vaza` e `Jogada` do modelo: usa `VazaVisivel` e `JogadaVisivel(jogador, Optional<Carta>, encoberta)`, e a carta encoberta só aparece para quem a jogou, inclusive depois da rodada.
 - **M5** `Correr` também vale na própria vez, sem pedido pendente: a equipe adversária ganha `EscadaDeApostas.valorAoDesistir(valor atual)`.
+- **M6** Descarte pela opção A (aprovada): a cada carta da vez, todos respondem, e o passo só se resolve quando todos responderam. Assim, para quem não tem a carta, "o dono recusou" e "ninguém tinha" geram as mesmas visões, ações e eventos (há teste disso). Esconder o tempo de resposta fica com o servidor (por exemplo, uma janela igual para todos).
+- **M6** `FaseDaRodada.AguardandoDescarte(cartaDaVez)`; `Acao` ganhou `Descartar` e `RecusarDescarte`; `Evento` ganhou `CartaDescartada` (pública, com quem descartou), `CartaRecebidaPorDescarte` (privada) e `DescarteEncerrado`. A `Rodada` guarda um `Descarte` (descartadas, se acabou, quem já respondeu e se o dono descarta), e a visão mostra as descartadas e a carta da vez, com `vezDe` vazio no descarte.
+- **M6** `RegrasDeDescarte.sequencia(vira)` dá a sequência (vazia = sem descarte); a carta da vez é a seguinte depois das descartadas. A carta comprada sai do topo do baralho restante e fica na posição da descartada. Sem baralho restante, ninguém pode descartar (caso-limite que as regras não cobrem).
+- **M6** O descarte entra em `proximaFase` antes de tudo (RG-DESC-2), e toda mudança de estado da rodada passa por `MotorGenerico.comRodada`, que recalcula a fase.

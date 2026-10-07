@@ -1,6 +1,7 @@
 package io.github.joaomarcosvs.truco.partida;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
+import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
 import io.github.joaomarcosvs.truco.regras.paulista.TrucoPaulista;
 import java.util.List;
 
@@ -27,6 +28,20 @@ final class Partidas {
                 .filter(jogador -> !MOTOR.acoesLegais(estado, jogador).isEmpty())
                 .findFirst()
                 .orElseThrow();
+    }
+
+    /** Todos recusam o descarte até a fase acabar, e a rodada fica pronta para a 1ª vaza. */
+    static EstadoDaPartida passarDescarte(EstadoDaPartida estado) {
+        while (estado.rodada().fase() instanceof FaseDaRodada.AguardandoDescarte) {
+            estado = aplicarAceita(estado, daVez(estado), new RecusarDescarte()).novoEstado();
+        }
+        return estado;
+    }
+
+    /** O jogador da vez faz a primeira das suas ações legais. */
+    static Aplicada primeiraAcaoLegal(EstadoDaPartida estado) {
+        JogadorId jogador = daVez(estado);
+        return aplicarAceita(estado, jogador, MOTOR.acoesLegais(estado, jogador).getFirst());
     }
 
     /** Aplica uma ação que o motor precisa aceitar. */

@@ -6,12 +6,11 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.BETO;
 import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DA_ANA;
 import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DO_BETO;
 import static io.github.joaomarcosvs.truco.partida.Partidas.MOTOR;
-import static io.github.joaomarcosvs.truco.partida.Partidas.aplicarAceita;
 import static io.github.joaomarcosvs.truco.partida.Partidas.configuracao;
-import static io.github.joaomarcosvs.truco.partida.Partidas.daVez;
+import static io.github.joaomarcosvs.truco.partida.Partidas.passarDescarte;
+import static io.github.joaomarcosvs.truco.partida.Partidas.primeiraAcaoLegal;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
@@ -114,7 +113,8 @@ class VazaTest {
         Rodada rodada = estado.rodada();
         assertThat(estado.numeroDaRodada()).isEqualTo(2);
         assertThat(estado.carteador()).isEqualTo(BETO);
-        assertThat(rodada.fase()).isEqualTo(new AguardandoJogada(ANA));
+        assertThat(rodada.fase()).isInstanceOf(FaseDaRodada.AguardandoDescarte.class); // RG-DESC-2
+        assertThat(passarDescarte(estado).rodada().fase()).isEqualTo(new AguardandoJogada(ANA));
         assertThat(rodada.maoDe(ANA)).hasSize(3);
         assertThat(rodada.maoDe(BETO)).hasSize(3);
         assertThat(rodada.vazas()).isEmpty();
@@ -132,7 +132,7 @@ class VazaTest {
         List<JogadorId> carteadores = new ArrayList<>(List.of(estado.carteador()));
         while (carteadores.size() < 6) {
             int rodadaAntes = estado.numeroDaRodada();
-            estado = aplicarAceita(estado, daVez(estado), new JogarCarta(0)).novoEstado();
+            estado = primeiraAcaoLegal(estado).novoEstado();
             if (estado.numeroDaRodada() > rodadaAntes) {
                 carteadores.add(estado.carteador());
             }

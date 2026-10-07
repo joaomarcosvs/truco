@@ -7,6 +7,7 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.ANA;
 import static io.github.joaomarcosvs.truco.partida.Partidas.BETO;
 import static io.github.joaomarcosvs.truco.partida.Partidas.MOTOR;
 import static io.github.joaomarcosvs.truco.partida.Partidas.configuracao;
+import static io.github.joaomarcosvs.truco.partida.Partidas.passarDescarte;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.entry;
@@ -21,7 +22,8 @@ import org.junit.jupiter.api.Test;
 
 class InformacaoOcultaTest {
 
-    private final EstadoDaPartida estado = MOTOR.novaPartida(configuracao(2026));
+    /** Partida já pronta para a 1ª vaza, depois do descarte. */
+    private final EstadoDaPartida estado = passarDescarte(MOTOR.novaPartida(configuracao(2026)));
 
     @Test
     @DisplayName("RG-VIS-1: o jogador vê a própria mão, a vira, o placar, a rodada e de quem é a vez")

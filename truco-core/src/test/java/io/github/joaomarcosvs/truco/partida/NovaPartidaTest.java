@@ -6,6 +6,7 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DA_ANA;
 import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DO_BETO;
 import static io.github.joaomarcosvs.truco.partida.Partidas.MOTOR;
 import static io.github.joaomarcosvs.truco.partida.Partidas.configuracao;
+import static io.github.joaomarcosvs.truco.partida.Partidas.passarDescarte;
 import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -13,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
+import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.regras.paulista.TrucoPaulista;
 import java.util.List;
@@ -57,7 +59,7 @@ class NovaPartidaTest {
     void viraNaoEJogada() {
         JogadorId daVez = configuracao.aDireitaDe(estado.carteador());
 
-        assertThat(MOTOR.acoesLegais(estado, daVez))
+        assertThat(MOTOR.acoesLegais(passarDescarte(estado), daVez))
                 .containsExactly(
                         new JogarCarta(0), new JogarCarta(1), new JogarCarta(2), new PedirAumento(), new Correr());
     }
@@ -97,9 +99,21 @@ class NovaPartidaTest {
     @DisplayName("RG-PARTIDA-4: abre a 1ª vaza o jogador à direita do carteador")
     void abreADireitaDoCarteador() {
         JogadorId aDireita = configuracao.aDireitaDe(estado.carteador());
+        EstadoDaPartida primeiraVaza = passarDescarte(estado);
 
-        assertThat(rodada.fase()).isEqualTo(new FaseDaRodada.AguardandoJogada(aDireita));
-        assertThat(MOTOR.acoesLegais(estado, estado.carteador())).isEmpty();
+        assertThat(primeiraVaza.rodada().fase()).isEqualTo(new FaseDaRodada.AguardandoJogada(aDireita));
+        assertThat(MOTOR.acoesLegais(primeiraVaza, estado.carteador())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("RG-DESC-2: a rodada começa pelo descarte, com a primeira carta da sequência como carta da vez")
+    void comecaPeloDescarte() {
+        Carta primeiraDaSequencia =
+                new TrucoPaulista().regrasDeDescarte().sequencia(rodada.vira()).getFirst();
+
+        assertThat(rodada.fase()).isEqualTo(new FaseDaRodada.AguardandoDescarte(primeiraDaSequencia));
+        assertThat(MOTOR.acoesLegais(estado, ANA)).contains(new RecusarDescarte());
+        assertThat(MOTOR.acoesLegais(estado, BETO)).contains(new RecusarDescarte());
     }
 
     @Test

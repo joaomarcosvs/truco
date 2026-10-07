@@ -14,15 +14,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.acao.Aceitar;
 import io.github.joaomarcosvs.truco.acao.Correr;
+import io.github.joaomarcosvs.truco.acao.Descartar;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
+import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.RodadaIniciada;
+import io.github.joaomarcosvs.truco.partida.FaseDaRodada.AguardandoDescarte;
 import io.github.joaomarcosvs.truco.regras.paulista.TrucoPaulista;
 import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -52,6 +56,12 @@ class PartidaAleatoriaPropriedadesTest {
             new JogarEncoberta(1),
             new JogarEncoberta(2),
             new JogarEncoberta(3),
+            new Descartar(-1),
+            new Descartar(0),
+            new Descartar(1),
+            new Descartar(2),
+            new Descartar(3),
+            new RecusarDescarte(),
             new PedirAumento(),
             new Aceitar(),
             new Correr());
@@ -63,7 +73,8 @@ class PartidaAleatoriaPropriedadesTest {
     private record Passo(EstadoDaPartida antes, JogadorId jogador, Acao acao, Aplicada aplicada) {}
 
     @Property
-    @Label("Conservação: mãos, baralho restante, vira e cartas jogadas somam sempre as 40 cartas, sem repetição")
+    @Label("Conservação: mãos, baralho restante, vira, descartadas e jogadas somam sempre as 40 cartas, sem"
+            + " repetição")
     void conservacaoDasCartas(@ForAll long seed, @ForAll("escolhas") List<Integer> escolhas) {
         for (Passo passo : jogar(seed, escolhas)) {
             assertThat(CartasPresentes.naRodada(passo.antes().rodada())).containsExactlyInAnyOrderElementsOf(BARALHO);
@@ -95,7 +106,13 @@ class PartidaAleatoriaPropriedadesTest {
             EstadoDaPartida depois = passo.aplicada().novoEstado();
             for (JogadorId jogador : List.of(ANA, BETO)) {
                 VisaoDoJogador visao = MOTOR.visaoDe(depois, jogador);
-                assertNaoMostra(visao, ocultasPara(jogador, depois.rodada()), "a visão de " + jogador);
+                // A carta da vez no descarte é pública (sai da vira e das descartadas); o que não pode vazar é quem
+                // a tem. Ela é conferida à parte, e o resto da visão passa pela varredura.
+                Optional<Carta> cartaDaVez = depois.rodada().fase() instanceof AguardandoDescarte(Carta carta)
+                        ? Optional.of(carta)
+                        : Optional.empty();
+                assertThat(visao.cartaDaVezNoDescarte()).isEqualTo(cartaDaVez);
+                assertNaoMostra(semCartaDaVez(visao), ocultasPara(jogador, depois.rodada()), "a visão de " + jogador);
 
                 // Os eventos até RodadaIniciada falam da rodada que terminou; os seguintes, da rodada nova.
                 List<Evento> eventos = passo.aplicada().eventos().stream()
@@ -106,7 +123,11 @@ class PartidaAleatoriaPropriedadesTest {
                         .findFirst()
                         .orElse(eventos.size());
                 Set<Carta> ocultasAntes = ocultasPara(jogador, passo.antes().rodada());
-                cartaRevelada(passo).ifPresent(ocultasAntes::remove);
+                ocultasAntes.removeAll(cartasReveladas(passo));
+                if (depois.numeroDaRodada() == passo.antes().numeroDaRodada()) {
+                    // A carta comprada no descarte passa a ser do próprio jogador, que pode vê-la (RG-DESC-8).
+                    ocultasAntes.removeAll(depois.rodada().maoDe(jogador));
+                }
                 assertNaoMostra(eventos.subList(0, inicioDaNovaRodada), ocultasAntes, "os eventos de " + jogador);
                 assertNaoMostra(
                         eventos.subList(inicioDaNovaRodada, eventos.size()),
@@ -150,16 +171,39 @@ class PartidaAleatoriaPropriedadesTest {
         return Arbitraries.integers().between(0, 99).list().ofMaxSize(80);
     }
 
-    /** A carta que a ação tornou pública. */
-    private static Optional<Carta> cartaRevelada(Passo passo) {
-        return switch (passo.acao()) {
-            case JogarCarta(int indiceNaMao) ->
-                Optional.of(passo.antes().rodada().maoDe(passo.jogador()).get(indiceNaMao));
-            case PedirAumento pedido -> Optional.empty();
-            case Aceitar aceite -> Optional.empty();
-            case Correr corrida -> Optional.empty();
-            case JogarEncoberta encoberta -> Optional.empty(); // RG-ENC-3
-        };
+    /**
+     * As cartas que o passo tornou públicas: a jogada aberta e as descartadas (RG-DESC-8). A encoberta não se revela
+     * (RG-ENC-3), e um descarte pode se resolver na resposta de outro jogador (RG-DESC-10).
+     */
+    private static Set<Carta> cartasReveladas(Passo passo) {
+        Set<Carta> reveladas = new HashSet<>();
+        if (passo.acao() instanceof JogarCarta(int indiceNaMao)) {
+            reveladas.add(passo.antes().rodada().maoDe(passo.jogador()).get(indiceNaMao));
+        }
+        EstadoDaPartida depois = passo.aplicada().novoEstado();
+        if (depois.numeroDaRodada() == passo.antes().numeroDaRodada()) {
+            reveladas.addAll(depois.rodada().descarte().descartadas());
+        }
+        return reveladas;
+    }
+
+    private static VisaoDoJogador semCartaDaVez(VisaoDoJogador visao) {
+        return new VisaoDoJogador(
+                visao.jogador(),
+                visao.jogadoresNaOrdemDaMesa(),
+                visao.equipes(),
+                visao.placar(),
+                visao.numeroDaRodada(),
+                visao.carteador(),
+                visao.aposta(),
+                visao.vira(),
+                visao.descartadas(),
+                Optional.empty(),
+                visao.mao(),
+                visao.cartasNaMao(),
+                visao.vazas(),
+                visao.vazaAtual(),
+                visao.vezDe());
     }
 
     private static void assertNaoMostra(Object objeto, Set<Carta> ocultas, String onde) {

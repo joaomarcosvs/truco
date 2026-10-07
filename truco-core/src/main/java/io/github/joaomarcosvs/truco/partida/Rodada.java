@@ -9,14 +9,15 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * A rodada em andamento (RG-PARTIDA-2): a aposta, a vira, as mãos, o baralho restante, as vazas encerradas, as jogadas
- * da vaza em andamento e a fase. Contém informação oculta, então só o servidor a enxerga.
+ * A rodada em andamento (RG-PARTIDA-2): a aposta, a vira, as mãos, o baralho restante, o descarte, as vazas encerradas,
+ * as jogadas da vaza em andamento e a fase. Contém informação oculta, então só o servidor a enxerga.
  */
 public record Rodada(
         Aposta aposta,
         Optional<Carta> vira,
         Map<JogadorId, List<Carta>> maos,
         List<Carta> baralhoRestante,
+        Descarte descarte,
         List<Vaza> vazas,
         List<Jogada> vazaAtual,
         FaseDaRodada fase) {
@@ -27,6 +28,7 @@ public record Rodada(
         maos = maos.entrySet().stream()
                 .collect(toUnmodifiableMap(Map.Entry::getKey, entrada -> List.copyOf(entrada.getValue())));
         baralhoRestante = List.copyOf(baralhoRestante);
+        Objects.requireNonNull(descarte, "descarte");
         vazas = List.copyOf(vazas);
         vazaAtual = List.copyOf(vazaAtual);
         Objects.requireNonNull(fase, "fase");
@@ -44,5 +46,25 @@ public record Rodada(
     /** Número da vaza em andamento, a partir de 1. */
     public int numeroDaVazaAtual() {
         return vazas.size() + 1;
+    }
+
+    Rodada comAposta(Aposta novaAposta) {
+        return new Rodada(novaAposta, vira, maos, baralhoRestante, descarte, vazas, vazaAtual, fase);
+    }
+
+    Rodada comDescarte(Descarte novoDescarte) {
+        return new Rodada(aposta, vira, maos, baralhoRestante, novoDescarte, vazas, vazaAtual, fase);
+    }
+
+    Rodada comMaos(Map<JogadorId, List<Carta>> novasMaos, List<Carta> novoBaralhoRestante) {
+        return new Rodada(aposta, vira, novasMaos, novoBaralhoRestante, descarte, vazas, vazaAtual, fase);
+    }
+
+    Rodada comVazas(List<Vaza> novasVazas, List<Jogada> novaVazaAtual) {
+        return new Rodada(aposta, vira, maos, baralhoRestante, descarte, novasVazas, novaVazaAtual, fase);
+    }
+
+    Rodada comFase(FaseDaRodada novaFase) {
+        return new Rodada(aposta, vira, maos, baralhoRestante, descarte, vazas, vazaAtual, novaFase);
     }
 }

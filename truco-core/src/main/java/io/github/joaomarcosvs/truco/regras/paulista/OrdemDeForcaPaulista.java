@@ -29,7 +29,7 @@ import java.util.Optional;
 final class OrdemDeForcaPaulista implements OrdemDeForca {
 
     /** RG-CARTAS-2: da carta comum mais fraca para a mais forte. */
-    private static final List<Valor> VALORES = List.of(QUATRO, CINCO, SEIS, SETE, DEZ, DAMA, VALETE, AS, DOIS, TRES);
+    static final List<Valor> VALORES = List.of(QUATRO, CINCO, SEIS, SETE, DEZ, DAMA, VALETE, AS, DOIS, TRES);
 
     /** RG-CARTAS-5: da manilha mais fraca para a mais forte (a de paus é o zap). */
     private static final List<Naipe> NAIPES_DAS_MANILHAS = List.of(OUROS, ESPADAS, COPAS, PAUS);
@@ -51,7 +51,7 @@ final class OrdemDeForcaPaulista implements OrdemDeForca {
     }
 
     /** RG-CARTAS-4: o valor seguinte ao da vira, em ordem circular (depois do 3 volta o 4). */
-    private static Valor manilha(Carta vira) {
+    static Valor manilha(Carta vira) {
         return VALORES.get((posicao(vira.valor()) + 1) % VALORES.size());
     }
 

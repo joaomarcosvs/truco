@@ -12,12 +12,13 @@ final class CartasPresentes {
 
     private CartasPresentes() {}
 
-    /** Todas as cartas da rodada: mãos, baralho restante, vira e cartas jogadas. */
+    /** Todas as cartas da rodada: mãos, baralho restante, vira, descartadas e cartas jogadas. */
     static List<Carta> naRodada(Rodada rodada) {
         List<Carta> cartas = new ArrayList<>();
         rodada.maos().values().forEach(cartas::addAll);
         cartas.addAll(rodada.baralhoRestante());
         rodada.vira().ifPresent(cartas::add);
+        cartas.addAll(rodada.descarte().descartadas());
         rodada.vazas().forEach(vaza -> vaza.jogadas().forEach(jogada -> cartas.add(jogada.carta())));
         rodada.vazaAtual().forEach(jogada -> cartas.add(jogada.carta()));
         return cartas;
