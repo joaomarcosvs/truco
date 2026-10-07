@@ -193,7 +193,7 @@ O que isso exige do desenho de hoje:
 - [x] M2 Cartas e força (RG-CARTAS-3 será testada no M3, junto com a distribuição)
 - [x] M3 Rodada sem aumentos (vencer com 12 pontos, de RG-PARTIDA-1, será testado no M7; correr, de RG-PARTIDA-5, no M4/M5)
 - [x] M4 Aumentos (correr na própria vez, de RG-AUM-6, entra no M5; as exceções de RG-AUM-7 e "rodada de 12 vence a partida", de RG-AUM-1, no M7)
-- [ ] M5 Carta encoberta e correr
+- [x] M5 Carta encoberta e correr (a proibição de encoberta na Rodada Escurinho entra no M7)
 - [ ] M6 Descarte
 - [ ] M7 Partida completa
 - [ ] M8 Jogável (bots + CLI)
@@ -221,3 +221,6 @@ O que isso exige do desenho de hoje:
 - **M4** `Aposta` (valor, equipe que aceitou o último aumento e pedido pendente) substitui o `valor` da `Rodada` e vai inteira na `VisaoDoJogador`, porque é pública. A fase `AguardandoRespostaDeAumento(respondedor, nivelProposto)` sai do pedido pendente, em `proximaFase`. `Acao` ganhou `PedirAumento`, `Aceitar` e `Correr`; `Evento` ganhou `AumentoPedido`, `AumentoAceito` e `JogadorCorreu`.
 - **M4** `EscadaDeApostas` tem `proximoNivel`, `valorAoCorrer` e `podeAumentar` (teto e direito de aumentar). O motor só registra quem aceitou; a regra de quem pode pedir fica na escada.
 - **M4** Responde a um pedido o adversário à direita de quem pediu; num "pedir mais", responde quem tinha pedido, e o motor emite `AumentoAceito` e `AumentoPedido`. Aceito o aumento, a vez volta para quem ia jogar, que pode pedir o nível seguinte na hora se tiver o direito. `Correr` por enquanto só responde a um pedido.
+- **M5** `Jogada` ganhou `encoberta` (fábricas `Jogada.aberta` e `Jogada.encoberta`), e o estado do servidor guarda a carta encoberta. `Acao` ganhou `JogarEncoberta`; `Evento` ganhou `CartaEncobertaJogada`, sem a carta. `RegrasDeVaza.permiteEncoberta(numeroDaVaza)` libera a encoberta da 2ª vaza em diante, e o resultado da vaza só compara as cartas abertas (todas encobertas: empate).
+- **M5** A `VisaoDoJogador` não expõe mais `Vaza` e `Jogada` do modelo: usa `VazaVisivel` e `JogadaVisivel(jogador, Optional<Carta>, encoberta)`, e a carta encoberta só aparece para quem a jogou, inclusive depois da rodada.
+- **M5** `Correr` também vale na própria vez, sem pedido pendente: a equipe adversária ganha `EscadaDeApostas.valorAoDesistir(valor atual)`.

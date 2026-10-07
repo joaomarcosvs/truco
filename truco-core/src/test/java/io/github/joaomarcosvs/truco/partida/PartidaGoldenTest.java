@@ -11,9 +11,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.AumentoAceito;
 import io.github.joaomarcosvs.truco.evento.AumentoPedido;
+import io.github.joaomarcosvs.truco.evento.CartaEncobertaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
 import io.github.joaomarcosvs.truco.evento.Evento;
@@ -91,19 +93,20 @@ class PartidaGoldenTest {
     }
 
     @Test
-    @DisplayName("Seed 2026, cada jogador sempre escolhe a última ação legal: aumentos até o doze e corrida")
+    @DisplayName("Seed 2026, cada jogador pede mais sempre que pode, senão escolhe a última ação: aumentos até o doze")
     void aumentosAteODoze() {
         EstadoDaPartida estado = MOTOR.novaPartida(configuracao(2026));
         List<String> linhas = new ArrayList<>(inicio(estado));
         while (estado.numeroDaRodada() <= 2) {
             JogadorId jogador = daVez(estado);
-            Acao ultima = MOTOR.acoesLegais(estado, jogador).getLast();
-            Aplicada aplicada = aplicarAceita(estado, jogador, ultima);
+            List<Acao> legais = MOTOR.acoesLegais(estado, jogador);
+            Acao escolhida = legais.contains(new PedirAumento()) ? new PedirAumento() : legais.getLast();
+            Aplicada aplicada = aplicarAceita(estado, jogador, escolhida);
             aplicada.eventos().forEach(evento -> linhas.add(descrever(evento)));
             estado = aplicada.novoEstado();
         }
 
-        // A última ação legal é sempre pedir mais; no doze, que é o teto, só resta aceitar ou correr.
+        // No doze, que é o teto, não há como pedir mais, e a última ação legal é correr.
         assertThat(String.join("\n", linhas)).isEqualTo("""
                         rodada 1: ana dá as cartas, vale 1, vira Q♦
                         beto recebe 5♥ 10♣ 7♦
@@ -166,6 +169,7 @@ class PartidaGoldenTest {
                                         .map(Carta::toString)
                                         .collect(joining(" ")));
             case CartaJogada jogada -> "%s joga %s".formatted(jogada.jogador(), jogada.carta());
+            case CartaEncobertaJogada encoberta -> "%s joga encoberta".formatted(encoberta.jogador());
             case VazaFinalizada vaza ->
                 "vaza %d: %s"
                         .formatted(

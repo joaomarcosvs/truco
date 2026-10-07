@@ -7,10 +7,12 @@ import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.acao.Aceitar;
 import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.AumentoAceito;
 import io.github.joaomarcosvs.truco.evento.AumentoPedido;
+import io.github.joaomarcosvs.truco.evento.CartaEncobertaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
 import io.github.joaomarcosvs.truco.evento.Evento;
@@ -25,6 +27,8 @@ import io.github.joaomarcosvs.truco.partida.FaseDaRodada.AguardandoRespostaDeAum
 import io.github.joaomarcosvs.truco.regras.EscadaDeApostas;
 import io.github.joaomarcosvs.truco.regras.RegrasDeVaza;
 import io.github.joaomarcosvs.truco.regras.VarianteDeRegras;
+import io.github.joaomarcosvs.truco.visao.JogadaVisivel;
+import io.github.joaomarcosvs.truco.visao.VazaVisivel;
 import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -55,13 +59,21 @@ final class MotorGenerico implements MotorDeTruco {
         switch (rodada.fase()) {
             case AguardandoJogada aguardando
             when aguardando.jogador().equals(jogador) -> {
-                for (int indiceNaMao = 0; indiceNaMao < rodada.maoDe(jogador).size(); indiceNaMao++) {
+                int cartasNaMao = rodada.maoDe(jogador).size();
+                for (int indiceNaMao = 0; indiceNaMao < cartasNaMao; indiceNaMao++) {
                     acoes.add(new JogarCarta(indiceNaMao));
+                }
+                // RG-ENC-1: carta encoberta só a partir da 2ª vaza.
+                if (configuracao.variante().regrasDeVaza().permiteEncoberta(rodada.numeroDaVazaAtual())) {
+                    for (int indiceNaMao = 0; indiceNaMao < cartasNaMao; indiceNaMao++) {
+                        acoes.add(new JogarEncoberta(indiceNaMao));
+                    }
                 }
                 // RG-AUM-2 e RG-AUM-5: na sua vez, antes de jogar, quem tem o direito pode pedir aumento.
                 if (escada.podeAumentar(rodada.aposta(), configuracao.equipeDe(jogador))) {
                     acoes.add(new PedirAumento());
                 }
+                acoes.add(new Correr()); // RG-AUM-6
             }
             case AguardandoRespostaDeAumento resposta
             when resposta.respondedor().equals(jogador) -> {
@@ -92,7 +104,8 @@ final class MotorGenerico implements MotorDeTruco {
         }
         List<Evento> eventos = new ArrayList<>();
         EstadoDaPartida novoEstado = switch (acao) {
-            case JogarCarta(int indiceNaMao) -> jogarCarta(estado, jogador, indiceNaMao, eventos);
+            case JogarCarta(int indiceNaMao) -> jogarCarta(estado, jogador, indiceNaMao, false, eventos);
+            case JogarEncoberta(int indiceNaMao) -> jogarCarta(estado, jogador, indiceNaMao, true, eventos);
             case PedirAumento pedido -> pedirAumento(estado, jogador, eventos);
             case Aceitar aceite -> aceitarAumento(estado, jogador, eventos);
             case Correr corrida -> correr(estado, jogador, eventos);
@@ -125,13 +138,27 @@ final class MotorGenerico implements MotorDeTruco {
                 rodada.vira(),
                 rodada.maoDe(jogador),
                 cartasNaMao,
-                rodada.vazas(),
-                rodada.vazaAtual(),
+                rodada.vazas().stream()
+                        .map(vaza -> new VazaVisivel(visiveis(vaza.jogadas(), jogador), vaza.resultado()))
+                        .toList(),
+                visiveis(rodada.vazaAtual(), jogador),
                 vezDe);
     }
 
+    /** As jogadas como o observador as vê: a carta encoberta só aparece para quem a jogou (RG-ENC-3). */
+    private static List<JogadaVisivel> visiveis(List<Jogada> jogadas, JogadorId observador) {
+        return jogadas.stream()
+                .map(jogada -> new JogadaVisivel(
+                        jogada.jogador(),
+                        jogada.encoberta() && !jogada.jogador().equals(observador)
+                                ? Optional.empty()
+                                : Optional.of(jogada.carta()),
+                        jogada.encoberta()))
+                .toList();
+    }
+
     private static EstadoDaPartida jogarCarta(
-            EstadoDaPartida estado, JogadorId jogador, int indiceNaMao, List<Evento> eventos) {
+            EstadoDaPartida estado, JogadorId jogador, int indiceNaMao, boolean encoberta, List<Evento> eventos) {
         ConfiguracaoDaPartida configuracao = estado.configuracao();
         RegrasDeVaza regras = configuracao.variante().regrasDeVaza();
         Rodada rodada = estado.rodada();
@@ -140,9 +167,13 @@ final class MotorGenerico implements MotorDeTruco {
         Carta carta = mao.remove(indiceNaMao);
         Map<JogadorId, List<Carta>> maos = new HashMap<>(rodada.maos());
         maos.put(jogador, mao);
-        eventos.add(new CartaJogada(jogador, carta, rodada.numeroDaVazaAtual()));
+        // RG-ENC-3: da carta encoberta, os outros só sabem que foi jogada.
+        eventos.add(
+                encoberta
+                        ? new CartaEncobertaJogada(jogador, rodada.numeroDaVazaAtual())
+                        : new CartaJogada(jogador, carta, rodada.numeroDaVazaAtual()));
 
-        List<Jogada> vazaAtual = comAcrescimo(rodada.vazaAtual(), new Jogada(jogador, carta));
+        List<Jogada> vazaAtual = comAcrescimo(rodada.vazaAtual(), new Jogada(jogador, carta, encoberta));
         List<Vaza> vazas = rodada.vazas();
         if (vazaAtual.size() == configuracao.jogadoresNaOrdemDaMesa().size()) {
             ResultadoDaVaza resultado = regras.resultado(vazaAtual, rodada.vira(), configuracao::equipeDe);
@@ -190,11 +221,24 @@ final class MotorGenerico implements MotorDeTruco {
     }
 
     private static EstadoDaPartida correr(EstadoDaPartida estado, JogadorId jogador, List<Evento> eventos) {
-        PedidoDeAumento pedido = estado.rodada().aposta().pedidoPendente().orElseThrow();
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        EscadaDeApostas escada = configuracao.variante().escadaDeApostas();
+        Aposta aposta = estado.rodada().aposta();
         eventos.add(new JogadorCorreu(jogador));
-        // RG-AUM-3 e RG-AUM-4: quem pediu ganha o valor que a rodada tinha antes do pedido.
-        int pontos = estado.configuracao().variante().escadaDeApostas().valorAoCorrer(pedido.nivelProposto());
-        return darVitoria(estado, estado.configuracao().equipeDe(pedido.pedinte()), pontos, eventos);
+        Optional<PedidoDeAumento> pendente = aposta.pedidoPendente();
+        if (pendente.isPresent()) {
+            // RG-AUM-3 e RG-AUM-4: quem pediu ganha o valor que a rodada tinha antes do pedido.
+            int pontos = escada.valorAoCorrer(pendente.get().nivelProposto());
+            return darVitoria(estado, configuracao.equipeDe(pendente.get().pedinte()), pontos, eventos);
+        }
+        // RG-AUM-6: quem corre na própria vez entrega a rodada à equipe adversária.
+        EquipeId propria = configuracao.equipeDe(jogador);
+        EquipeId adversaria = configuracao.equipes().stream()
+                .map(Equipe::id)
+                .filter(equipe -> !equipe.equals(propria))
+                .findFirst()
+                .orElseThrow();
+        return darVitoria(estado, adversaria, escada.valorAoDesistir(aposta.valor()), eventos);
     }
 
     /**

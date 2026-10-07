@@ -7,6 +7,7 @@ import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.acao.Aceitar;
 import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import java.util.ArrayList;
@@ -22,14 +23,14 @@ final class MesaDeTeste {
         this.estado = estado;
     }
 
-    /** O jogador joga a carta indicada, que precisa estar na mão dele. */
+    /** O jogador joga aberta a carta indicada, que precisa estar na mão dele. */
     MesaDeTeste jogar(JogadorId jogador, String notacao) {
-        int indice = estado.rodada().maoDe(jogador).indexOf(carta(notacao));
-        if (indice < 0) {
-            throw new AssertionError(jogador + " não tem " + notacao + " na mão: "
-                    + estado.rodada().maoDe(jogador));
-        }
-        return agir(jogador, new JogarCarta(indice));
+        return agir(jogador, new JogarCarta(posicaoNaMao(jogador, notacao)));
+    }
+
+    /** O jogador joga encoberta a carta indicada, que precisa estar na mão dele. */
+    MesaDeTeste jogarEncoberta(JogadorId jogador, String notacao) {
+        return agir(jogador, new JogarEncoberta(posicaoNaMao(jogador, notacao)));
     }
 
     MesaDeTeste pedirAumento(JogadorId jogador) {
@@ -49,6 +50,15 @@ final class MesaDeTeste {
         estado = aplicada.novoEstado();
         eventos.addAll(aplicada.eventos());
         return this;
+    }
+
+    private int posicaoNaMao(JogadorId jogador, String notacao) {
+        int indice = estado.rodada().maoDe(jogador).indexOf(carta(notacao));
+        if (indice < 0) {
+            throw new AssertionError(jogador + " não tem " + notacao + " na mão: "
+                    + estado.rodada().maoDe(jogador));
+        }
+        return indice;
     }
 
     EstadoDaPartida estado() {

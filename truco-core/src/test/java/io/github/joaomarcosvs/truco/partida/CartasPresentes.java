@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /** Onde as cartas aparecem: na rodada, para a conservação, e em visões e eventos, para a informação oculta. */
 final class CartasPresentes {
@@ -22,7 +23,10 @@ final class CartasPresentes {
         return cartas;
     }
 
-    /** As cartas que o jogador não pode ver: as mãos dos outros e o baralho restante (RG-VIS-2). */
+    /**
+     * As cartas que o jogador não pode ver: as mãos dos outros, o baralho restante (RG-VIS-2) e as cartas que os outros
+     * jogaram encobertas (RG-ENC-3).
+     */
     static Set<Carta> ocultasPara(JogadorId jogador, Rodada rodada) {
         Set<Carta> ocultas = new HashSet<>(rodada.baralhoRestante());
         rodada.maos().forEach((dono, mao) -> {
@@ -30,6 +34,9 @@ final class CartasPresentes {
                 ocultas.addAll(mao);
             }
         });
+        Stream.concat(rodada.vazas().stream().flatMap(vaza -> vaza.jogadas().stream()), rodada.vazaAtual().stream())
+                .filter(jogada -> jogada.encoberta() && !jogada.jogador().equals(jogador))
+                .forEach(jogada -> ocultas.add(jogada.carta()));
         return ocultas;
     }
 

@@ -35,14 +35,25 @@ final class RegrasDeVazaPaulista implements RegrasDeVaza {
     }
 
     @Override
+    public boolean permiteEncoberta(int numeroDaVaza) {
+        return numeroDaVaza >= 2; // RG-ENC-1
+    }
+
+    @Override
     public ResultadoDaVaza resultado(
             List<Jogada> jogadas, Optional<Carta> vira, Function<JogadorId, EquipeId> equipeDe) {
-        // RG-VAZA-2: vence a carta mais forte; se as mais fortes são de equipes diferentes, a vaza empata.
-        int maisForte = jogadas.stream()
+        // RG-ENC-2: a carta encoberta não conta na comparação.
+        List<Jogada> abertas =
+                jogadas.stream().filter(jogada -> !jogada.encoberta()).toList();
+        if (abertas.isEmpty()) {
+            return new Empatada(); // RG-ENC-4
+        }
+        // RG-VAZA-2: vence a carta aberta mais forte; se as mais fortes são de equipes diferentes, a vaza empata.
+        int maisForte = abertas.stream()
                 .mapToInt(jogada -> ordemDeForca.forca(jogada.carta(), vira))
                 .max()
-                .orElseThrow(() -> new IllegalArgumentException("Uma vaza precisa de jogadas"));
-        List<Jogada> maisFortes = jogadas.stream()
+                .orElseThrow();
+        List<Jogada> maisFortes = abertas.stream()
                 .filter(jogada -> ordemDeForca.forca(jogada.carta(), vira) == maisForte)
                 .toList();
         long equipes = maisFortes.stream()

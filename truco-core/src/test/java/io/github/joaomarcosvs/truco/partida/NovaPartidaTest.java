@@ -10,6 +10,7 @@ import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
@@ -57,7 +58,8 @@ class NovaPartidaTest {
         JogadorId daVez = configuracao.aDireitaDe(estado.carteador());
 
         assertThat(MOTOR.acoesLegais(estado, daVez))
-                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2), new PedirAumento());
+                .containsExactly(
+                        new JogarCarta(0), new JogarCarta(1), new JogarCarta(2), new PedirAumento(), new Correr());
     }
 
     @Test

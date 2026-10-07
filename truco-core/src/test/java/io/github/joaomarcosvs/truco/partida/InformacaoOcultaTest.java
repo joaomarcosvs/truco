@@ -12,8 +12,10 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.entry;
 
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
+import io.github.joaomarcosvs.truco.visao.JogadaVisivel;
 import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +59,7 @@ class InformacaoOcultaTest {
         mesa.jogar(BETO, "3♠");
 
         VisaoDoJogador daAna = MOTOR.visaoDe(mesa.estado(), ANA);
-        assertThat(daAna.vazaAtual()).containsExactly(new Jogada(BETO, carta("3♠")));
+        assertThat(daAna.vazaAtual()).containsExactly(new JogadaVisivel(BETO, Optional.of(carta("3♠")), false));
         assertThat(daAna.cartasNaMao()).containsEntry(BETO, 2);
         assertThat(mesa.eventos()).allMatch(evento -> evento.visivelPara(ANA) && evento.visivelPara(BETO));
     }

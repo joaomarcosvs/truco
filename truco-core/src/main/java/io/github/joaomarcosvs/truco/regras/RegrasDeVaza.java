@@ -17,6 +17,9 @@ public interface RegrasDeVaza {
     /** Quantas cartas cada jogador recebe na distribuição (RG-PARTIDA-2 no Truco Paulista). */
     int cartasPorJogador();
 
+    /** Se é permitido jogar carta encoberta na vaza de número dado, contado a partir de 1 (RG-ENC-1). */
+    boolean permiteEncoberta(int numeroDaVaza);
+
     /**
      * Resultado de uma vaza completa, com as jogadas na ordem em que foram feitas. {@code equipeDe} informa a equipe de
      * cada jogador.

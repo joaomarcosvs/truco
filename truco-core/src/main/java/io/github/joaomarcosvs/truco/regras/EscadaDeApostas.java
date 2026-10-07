@@ -16,6 +16,9 @@ public interface EscadaDeApostas {
     /** Quanto ganha quem pediu um aumento quando o adversário corre do pedido. */
     int valorAoCorrer(int nivelRecusado);
 
+    /** Quanto ganha o adversário quando um jogador corre na própria vez, sem pedido pendente. */
+    int valorAoDesistir(int valorAtual);
+
     /** Se a equipe pode pedir aumento, dada a aposta atual (sem pedido pendente). */
     boolean podeAumentar(Aposta aposta, EquipeId equipe);
 }

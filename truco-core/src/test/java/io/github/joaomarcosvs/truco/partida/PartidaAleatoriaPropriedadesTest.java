@@ -15,6 +15,7 @@ import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.acao.Aceitar;
 import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.Evento;
@@ -46,6 +47,11 @@ class PartidaAleatoriaPropriedadesTest {
             new JogarCarta(1),
             new JogarCarta(2),
             new JogarCarta(3),
+            new JogarEncoberta(-1),
+            new JogarEncoberta(0),
+            new JogarEncoberta(1),
+            new JogarEncoberta(2),
+            new JogarEncoberta(3),
             new PedirAumento(),
             new Aceitar(),
             new Correr());
@@ -152,6 +158,7 @@ class PartidaAleatoriaPropriedadesTest {
             case PedirAumento pedido -> Optional.empty();
             case Aceitar aceite -> Optional.empty();
             case Correr corrida -> Optional.empty();
+            case JogarEncoberta encoberta -> Optional.empty(); // RG-ENC-3
         };
     }
 

@@ -34,6 +34,12 @@ final class EscadaDeApostasPaulista implements EscadaDeApostas {
     }
 
     @Override
+    public int valorAoDesistir(int valorAtual) {
+        posicao(valorAtual);
+        return valorAtual; // RG-AUM-6: o adversário ganha o valor atual da rodada.
+    }
+
+    @Override
     public boolean podeAumentar(Aposta aposta, EquipeId equipe) {
         // RG-AUM-1: o doze é o teto. RG-AUM-5: depois de um aceite, só a equipe que aceitou pode pedir o próximo.
         return proximoNivel(aposta.valor()).isPresent()

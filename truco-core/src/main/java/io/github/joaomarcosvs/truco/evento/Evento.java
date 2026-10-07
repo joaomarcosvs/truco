@@ -6,6 +6,7 @@ import io.github.joaomarcosvs.truco.partida.JogadorId;
 public sealed interface Evento
         permits AumentoAceito,
                 AumentoPedido,
+                CartaEncobertaJogada,
                 CartaJogada,
                 CartasDistribuidas,
                 JogadorCorreu,

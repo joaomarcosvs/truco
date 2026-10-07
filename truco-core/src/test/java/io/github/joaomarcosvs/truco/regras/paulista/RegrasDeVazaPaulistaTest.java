@@ -42,24 +42,59 @@ class RegrasDeVazaPaulistaTest {
     @Test
     @DisplayName("RG-VAZA-2: vence a vaza quem jogou a carta mais forte")
     void maisForteVence() {
-        assertThat(resultado(new Jogada(BETO, carta("5♦")), new Jogada(ANA, carta("3♠"))))
+        assertThat(resultado(Jogada.aberta(BETO, carta("5♦")), Jogada.aberta(ANA, carta("3♠"))))
                 .isEqualTo(new Vencida(ANA, EQUIPE_DA_ANA));
-        assertThat(resultado(new Jogada(BETO, carta("10♦")), new Jogada(ANA, carta("3♠"))))
+        assertThat(resultado(Jogada.aberta(BETO, carta("10♦")), Jogada.aberta(ANA, carta("3♠"))))
                 .isEqualTo(new Vencida(BETO, EQUIPE_DO_BETO));
     }
 
     @Test
     @DisplayName("RG-CARTAS-2: cartas comuns de mesmo valor, de equipes adversárias, empatam a vaza")
     void mesmoValorEmpata() {
-        assertThat(resultado(new Jogada(BETO, carta("A♥")), new Jogada(ANA, carta("A♠"))))
+        assertThat(resultado(Jogada.aberta(BETO, carta("A♥")), Jogada.aberta(ANA, carta("A♠"))))
                 .isEqualTo(new Empatada());
+    }
+
+    @Test
+    @DisplayName("RG-ENC-1: carta encoberta só a partir da 2ª vaza")
+    void encobertaAPartirDaSegundaVaza() {
+        assertThat(regras.permiteEncoberta(1)).isFalse();
+        assertThat(regras.permiteEncoberta(2)).isTrue();
+        assertThat(regras.permiteEncoberta(3)).isTrue();
+    }
+
+    @Test
+    @DisplayName(
+            "RG-ENC-2: a carta encoberta não conta: 6♣ aberta vence um A encoberto, e um 4 aberto vence o zap encoberto")
+    void encobertaPerdeParaQualquerAberta() {
+        assertThat(resultado(Jogada.aberta(BETO, carta("6♣")), Jogada.encoberta(ANA, carta("A♠"))))
+                .isEqualTo(new Vencida(BETO, EQUIPE_DO_BETO));
+        assertThat(resultado(Jogada.encoberta(BETO, carta("10♣")), Jogada.aberta(ANA, carta("4♦"))))
+                .isEqualTo(new Vencida(ANA, EQUIPE_DA_ANA));
+    }
+
+    @Test
+    @DisplayName("RG-ENC-4: se todas as cartas da vaza são encobertas, a vaza empata")
+    void todasEncobertasEmpatam() {
+        assertThat(resultado(Jogada.encoberta(BETO, carta("3♠")), Jogada.encoberta(ANA, carta("4♦"))))
+                .isEqualTo(new Empatada());
+    }
+
+    @Test
+    @DisplayName("RG-EMP-6 e RG-ENC-4: depois de uma vaza toda encoberta, abre a seguinte quem a abriu")
+    void quemAbriuAVazaEncobertaAbreASeguinte() {
+        Vaza vaza = new Vaza(
+                List.of(Jogada.encoberta(BETO, carta("3♠")), Jogada.encoberta(ANA, carta("4♦"))), new Empatada());
+
+        assertThat(regras.abreAProxima(vaza)).isEqualTo(BETO);
     }
 
     @Test
     @DisplayName("RG-VAZA-2: quem vence a vaza abre a seguinte")
     void vencedorAbreASeguinte() {
         Vaza vaza = new Vaza(
-                List.of(new Jogada(BETO, carta("5♦")), new Jogada(ANA, carta("3♠"))), new Vencida(ANA, EQUIPE_DA_ANA));
+                List.of(Jogada.aberta(BETO, carta("5♦")), Jogada.aberta(ANA, carta("3♠"))),
+                new Vencida(ANA, EQUIPE_DA_ANA));
 
         assertThat(regras.abreAProxima(vaza)).isEqualTo(ANA);
     }
@@ -67,7 +102,8 @@ class RegrasDeVazaPaulistaTest {
     @Test
     @DisplayName("RG-EMP-6: depois de uma vaza empatada, abre a seguinte quem abriu a empatada")
     void quemAbriuOEmpateAbreASeguinte() {
-        Vaza vaza = new Vaza(List.of(new Jogada(ANA, carta("A♠")), new Jogada(BETO, carta("A♥"))), new Empatada());
+        Vaza vaza =
+                new Vaza(List.of(Jogada.aberta(ANA, carta("A♠")), Jogada.aberta(BETO, carta("A♥"))), new Empatada());
 
         assertThat(regras.abreAProxima(vaza)).isEqualTo(ANA);
     }
@@ -109,7 +145,7 @@ class RegrasDeVazaPaulistaTest {
 
     /** Uma vaza resumida pelo resultado; as cartas não importam para o desfecho. */
     private static Vaza vaza(char resultado) {
-        List<Jogada> jogadas = List.of(new Jogada(BETO, carta("4♦")), new Jogada(ANA, carta("4♠")));
+        List<Jogada> jogadas = List.of(Jogada.aberta(BETO, carta("4♦")), Jogada.aberta(ANA, carta("4♠")));
         return new Vaza(
                 jogadas,
                 switch (resultado) {

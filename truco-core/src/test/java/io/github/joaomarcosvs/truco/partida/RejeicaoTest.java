@@ -9,7 +9,9 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.BETO;
 import static io.github.joaomarcosvs.truco.partida.Partidas.MOTOR;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,7 +54,13 @@ class RejeicaoTest {
 
         assertThat(mesa.estado().rodada().maoDe(BETO)).containsExactly(carta("A♥"), carta("5♦"));
         assertThat(MOTOR.acoesLegais(mesa.estado(), BETO))
-                .containsExactly(new JogarCarta(0), new JogarCarta(1), new PedirAumento());
+                .containsExactly(
+                        new JogarCarta(0),
+                        new JogarCarta(1),
+                        new JogarEncoberta(0),
+                        new JogarEncoberta(1),
+                        new PedirAumento(),
+                        new Correr());
         assertThat(MOTOR.aplicar(mesa.estado(), BETO, new JogarCarta(2))).isEqualTo(new Rejeitada(ACAO_INVALIDA));
     }
 }

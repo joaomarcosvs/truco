@@ -3,10 +3,8 @@ package io.github.joaomarcosvs.truco.visao;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.partida.Aposta;
 import io.github.joaomarcosvs.truco.partida.Equipe;
-import io.github.joaomarcosvs.truco.partida.Jogada;
 import io.github.joaomarcosvs.truco.partida.JogadorId;
 import io.github.joaomarcosvs.truco.partida.Placar;
-import io.github.joaomarcosvs.truco.partida.Vaza;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,8 +16,8 @@ import java.util.Optional;
  *
  * @param aposta quanto a rodada vale, quem pode aumentar e o pedido de aumento pendente
  * @param cartasNaMao quantas cartas cada jogador tem na mão
- * @param vazas as vazas encerradas da rodada
- * @param vazaAtual as jogadas da vaza em andamento
+ * @param vazas as vazas encerradas da rodada, sem as cartas encobertas dos outros
+ * @param vazaAtual as jogadas da vaza em andamento, sem as cartas encobertas dos outros
  * @param vezDe de quem se espera a próxima ação, quando isso é público
  */
 public record VisaoDoJogador(
@@ -33,8 +31,8 @@ public record VisaoDoJogador(
         Optional<Carta> vira,
         List<Carta> mao,
         Map<JogadorId, Integer> cartasNaMao,
-        List<Vaza> vazas,
-        List<Jogada> vazaAtual,
+        List<VazaVisivel> vazas,
+        List<JogadaVisivel> vazaAtual,
         Optional<JogadorId> vezDe) {
 
     public VisaoDoJogador {

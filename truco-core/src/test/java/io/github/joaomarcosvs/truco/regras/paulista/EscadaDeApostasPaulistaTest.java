@@ -42,6 +42,13 @@ class EscadaDeApostasPaulistaTest {
         assertThat(escada.valorAoCorrer(nivelRecusado)).isEqualTo(pontos);
     }
 
+    @ParameterizedTest(name = "rodada valendo {0}")
+    @CsvSource({"1", "3", "6", "9", "12"})
+    @DisplayName("RG-AUM-6: quem corre na própria vez entrega ao adversário o valor atual da rodada")
+    void valorAoDesistir(int valorAtual) {
+        assertThat(escada.valorAoDesistir(valorAtual)).isEqualTo(valorAtual);
+    }
+
     @Test
     @DisplayName("RG-AUM-5: antes de qualquer aceite, as duas equipes podem pedir; depois, só a que aceitou")
     void direitoDeAumentar() {
