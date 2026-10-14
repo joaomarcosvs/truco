@@ -17,6 +17,7 @@
         <module>truco-core</module>
         <module>truco-bots</module>
         <module>truco-cli</module>
+        <module>truco-protocol</module>
     </modules>
 
     <properties>
@@ -30,6 +31,9 @@
         <junit.version>5.14.4</junit.version>
         <assertj.version>3.27.7</assertj.version>
         <jqwik.version>1.10.1</jqwik.version>
+
+        <!-- Dependências de runtime (nunca no truco-core) -->
+        <jackson.version>3.2.3</jackson.version>
 
         <!-- Plugins -->
         <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
@@ -55,6 +59,11 @@
                 <groupId>io.github.joaomarcosvs</groupId>
                 <artifactId>truco-bots</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tools.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit</groupId>

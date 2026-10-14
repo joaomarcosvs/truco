@@ -1,6 +1,6 @@
 # CLAUDE.md — Truco (core)
 
-> Leia este arquivo inteiro antes de qualquer tarefa. As regras do jogo estão em `docs/regras-truco-paulista.md`.
+> Leia este arquivo inteiro antes de qualquer tarefa. As regras do jogo estão em `docs/regras-truco-paulista.md`; o formato JSON entre servidor e clientes, em `docs/protocolo.md`.
 
 ## 1. O que é este projeto
 
@@ -199,7 +199,7 @@ O que isso exige do desenho de hoje:
 - [x] M6 Descarte (RG-DESC-9, sem descarte na Rodada Escurinho, e o descarte na Rodada de Onze entram no M7)
 - [x] M7 Partida completa
 - [x] M8 Jogável (bots + CLI)
-- [ ] M9 Protocolo
+- [x] M9 Protocolo
 - [ ] M10 Prontidão de variante
 
 **Decisões registradas**
@@ -256,3 +256,18 @@ O que isso exige do desenho de hoje:
   - depois de decidir jogar a Onze, e na Escurinho, ninguém corre, porque nelas não há aumento.
 
   Uma propriedade confere a regra em partidas inteiras.
+- **M9** O `truco-protocol` (pacote `...truco.protocol`) depende do core e do Jackson 3.2.3 (`tools.jackson.core:jackson-databind`).
+  - A API pública é `ProtocoloJson` (escrever e ler ação, evento e visão) e `Leitura` (`Lida` ou `Invalida(motivo)`). A leitura nunca lança exceção, porque o servidor vai ler o que os clientes mandam.
+  - Os DTOs são internos ao módulo e espelham o modelo. A conversão de ida e volta usa `switch` exaustivo, então um tipo novo no core não compila sem o seu DTO.
+  - O contrato é o formato JSON, documentado em `docs/protocolo.md`. O estado completo da partida nunca vira JSON, e a visibilidade dos eventos não vai no JSON: o servidor filtra antes de enviar.
+- **M9** As regras do formato:
+  - os campos têm os nomes e a ordem dos records do modelo;
+  - ações, eventos, tipo de rodada e resultado da vaza levam `"tipo"`, com o nome da variante;
+  - a carta é `{"valor":"AS","naipe":"COPAS"}`, só em ASCII;
+  - valores ausentes saem como `null`, e todo tipo tem sempre os mesmos campos;
+  - placar e cartas na mão são objetos com as chaves em ordem alfabética, para o mesmo valor dar sempre o mesmo JSON;
+  - a leitura é estrita: campo desconhecido ou faltando, número como texto ou fração e texto depois do JSON tornam a mensagem inválida.
+- **M9** Os exemplos de `docs/protocolo.md` são os goldens. O `DocumentacaoDoProtocoloTest` lê o documento e confere que cada exemplo marcado é válido, volta igual e tem os campos do record do modelo, na mesma ordem, e que os exemplos cobrem todas as ações e todos os eventos. Além disso:
+  - uma propriedade faz ida e volta com toda ação legal, todo evento e toda visão de 200 partidas aleatórias inteiras;
+  - outro teste cobre as entradas inválidas.
+- **M9** Ficam para o servidor o envelope das mensagens de rede (tipo da mensagem, id da partida, versão do protocolo) e a resposta a uma ação rejeitada (`MotivoDeRejeicao`).
