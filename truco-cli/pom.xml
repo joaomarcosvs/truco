@@ -24,4 +24,49 @@
             <artifactId>truco-bots</artifactId>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!--
+                                Jar executável, com core e bots dentro: java -jar truco-cli/target/truco-cli.jar
+                                Fica num arquivo à parte, para não substituir o jar do módulo, que é a entrada do shade.
+                            -->
+                            <outputFile>${project.build.directory}/truco-cli.jar</outputFile>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <!-- Só o manifesto da CLI, que indica a classe principal. -->
+                                <filter>
+                                    <artifact>io.github.joaomarcosvs:truco-core</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>io.github.joaomarcosvs:truco-bots</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>io.github.joaomarcosvs.truco.cli.TrucoCli</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

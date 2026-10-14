@@ -38,6 +38,7 @@ Se uma tarefa parecer exigir algo fora do escopo, pare e pergunte.
 - Maven multi-módulo, sempre pelo Maven Wrapper (`./mvnw`, Maven 3.9.16). Requer `JAVA_HOME` apontando para um JDK 21+.
 - JUnit 5, AssertJ, jqwik (testes de propriedade)
 - Comandos: `./mvnw -q test` · `./mvnw -q -pl truco-core test` · `./mvnw -q verify` · `./mvnw spotless:apply` (formata o código)
+- Jogar contra o bot: `./mvnw -q package -DskipTests` e depois `java -jar truco-cli/target/truco-cli.jar [--seed N] [--letras]`
 - groupId: `io.github.joaomarcosvs` · pacote base: `io.github.joaomarcosvs.truco` (bots em `...truco.bots`, CLI em `...truco.cli`)
 - CI: GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw verify` a cada push na `main` e em pull requests
 
@@ -197,7 +198,7 @@ O que isso exige do desenho de hoje:
 - [x] M5 Carta encoberta e correr (a proibição de encoberta na Rodada Escurinho entra no M7)
 - [x] M6 Descarte (RG-DESC-9, sem descarte na Rodada Escurinho, e o descarte na Rodada de Onze entram no M7)
 - [x] M7 Partida completa
-- [ ] M8 Jogável (bots + CLI)
+- [x] M8 Jogável (bots + CLI)
 - [ ] M9 Protocolo
 - [ ] M10 Prontidão de variante
 
@@ -235,3 +236,17 @@ O que isso exige do desenho de hoje:
 - **M7** Fim de partida: quando um lado chega aos pontos para vencer, o `aplicar` emite `PartidaFinalizada` depois de `PlacarAtualizado` e não distribui outra rodada. O estado guarda a rodada final, com a última vaza, na fase `PartidaFinalizada(vencedora)`. Depois disso, `acoesLegais` volta vazia, `aplicar` devolve `Rejeitada(PARTIDA_FINALIZADA)` (motivo novo) e a visão mostra `vencedoraDaPartida`.
 - **M7** Na Escurinho não há `CartasDistribuidas`, e a visão traz a `mao` vazia (só `cartasNaMao`). O jogador escolhe a carta pela posição, e a carta jogada é revelada a todos.
 - **M7** Testes de partida inteira: propriedades (a partida sempre termina, as restrições da Onze e da Escurinho valem, nada vaza, nem a própria mão na Escurinho) e um golden de partida completa (seed 2026) que passa pela Rodada de Onze e pela Escurinho.
+- **M8** `BotAleatorio(seed)` escolhe entre as ações legais, todas com a mesma chance, usando um `java.util.Random`. O algoritmo do `Random` é fixo na especificação do Java, então a mesma seed dá as mesmas escolhas em qualquer JVM. Como adversário ele é fraco, porque corre com frequência. É de propósito: bots melhores estão fora do escopo, e o uniforme passa por todas as ações no fuzz.
+- **M8** O `Arbitro` (em `truco-bots`) conduz uma partida local. A cada passo, o primeiro jogador da mesa com ações legais recebe a própria visão e escolhe; uma ação fora das legais é bug da estratégia (`IllegalStateException`). A cada ação aplicada, ele avisa um `ObservadorDaPartida`. A CLI e o fuzz usam o árbitro; o servidor terá o próprio laço.
+- **M8** O fuzz global (`FuzzGlobalTest`, em `truco-bots`) usa só a API pública e roda dois lotes de partidas de `BotAleatorio` contra `BotAleatorio`:
+  - 2.000 partidas conferem que toda partida termina, que as ações da escada valem, que o placar nunca diminui, que as 40 cartas se conservam e, a cada passo, que uma ação sorteada é aceita se e só se for legal;
+  - 300 partidas conferem a visão e os eventos de cada bot.
+  Os vazamentos que atravessam rodadas continuam cobertos pelas propriedades do core.
+- **M8** A `truco-cli` tem quatro peças:
+  - `TrucoCli` lê `--seed N`, `--letras` e `--ajuda`. Sem `--seed`, sorteia uma seed e a mostra; o bot usa a mesma seed. O código de saída é 0 quando a partida termina, 1 quando é interrompida ("sair" ou fim da entrada) e 2 com opções inválidas.
+  - `JogadorHumano` é uma `Estrategia` de console: mostra um menu numerado só com as ações legais e passa sozinho no descarte quando a única opção é passar.
+  - `Narrador` descreve só os eventos `visivelPara` você, com `switch` exaustivo.
+  - `Tela` desenha a mesa a partir da `VisaoDoJogador`.
+
+  As cartas aparecem com os símbolos de naipe se o charset do terminal os codifica; senão, com letras (c, e, o, p).
+- **M8** O jar executável sai do `maven-shade-plugin` 3.6.2, em `truco-cli/target/truco-cli.jar`. Ele é separado do jar do módulo: se o substituísse, um build sem `clean` reprocessaria o próprio resultado. Só o manifesto da CLI entra no jar.
