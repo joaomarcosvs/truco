@@ -2,12 +2,14 @@ package io.github.joaomarcosvs.truco.partida;
 
 import static io.github.joaomarcosvs.truco.carta.NotacaoDeCartas.carta;
 import static io.github.joaomarcosvs.truco.partida.Partidas.ANA;
+import static io.github.joaomarcosvs.truco.partida.Partidas.BETO;
 import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DA_ANA;
 import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DO_BETO;
-import static io.github.joaomarcosvs.truco.partida.Partidas.configuracao;
 
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.carta.NotacaoDeCartas;
+import io.github.joaomarcosvs.truco.regras.VarianteDeRegras;
+import io.github.joaomarcosvs.truco.regras.paulista.TrucoPaulista;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -17,12 +19,14 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Monta uma rodada com vira, mãos e placar escolhidos, para testar as regras em situações exatas. Por padrão o placar é
- * 0 a 0, o descarte já terminou e a rodada está pronta para a 1ª vaza (ou para a decisão, se for de Onze).
+ * Monta uma rodada com vira, mãos e placar escolhidos, para testar as regras em situações exatas. Por padrão a variante
+ * é o Truco Paulista, o placar é 0 a 0, o descarte já terminou e a rodada está pronta para a 1ª vaza (ou para a
+ * decisão, se for de Onze).
  */
 final class Cenario {
 
-    private final Carta vira;
+    private final VarianteDeRegras variante;
+    private final Optional<Carta> vira;
     private JogadorId carteador = ANA;
     private final Map<JogadorId, List<Carta>> maos = new HashMap<>();
     private List<Carta> topoDoBaralho = List.of();
@@ -30,13 +34,19 @@ final class Cenario {
     private boolean semBaralho;
     private Placar placar = new Placar(Map.of(EQUIPE_DA_ANA, 0, EQUIPE_DO_BETO, 0));
 
-    private Cenario(Carta vira) {
+    private Cenario(VarianteDeRegras variante, Optional<Carta> vira) {
+        this.variante = variante;
         this.vira = vira;
     }
 
-    /** Cenário com a vira dada e Ana como carteadora, a menos que se indique outro carteador. */
+    /** Cenário de Truco Paulista com a vira dada e Ana como carteadora, a menos que se indique outro carteador. */
     static Cenario comVira(String vira) {
-        return new Cenario(carta(vira));
+        return new Cenario(new TrucoPaulista(), Optional.of(carta(vira)));
+    }
+
+    /** Cenário de uma variante sem vira, como a de manilhas fixas, com Ana como carteadora. */
+    static Cenario semVira(VarianteDeRegras variante) {
+        return new Cenario(variante, Optional.empty());
     }
 
     Cenario carteador(JogadorId carteador) {
@@ -69,8 +79,9 @@ final class Cenario {
     }
 
     EstadoDaPartida montar() {
-        ConfiguracaoDaPartida configuracao = configuracao(0);
-        List<Carta> usadas = new ArrayList<>(List.of(vira));
+        ConfiguracaoDaPartida configuracao =
+                new ConfiguracaoDaPartida(List.of(Equipe.individual(ANA), Equipe.individual(BETO)), variante, 0);
+        List<Carta> usadas = new ArrayList<>(vira.stream().toList());
         maos.values().forEach(usadas::addAll);
         usadas.addAll(topoDoBaralho);
         if (new HashSet<>(usadas).size() < usadas.size()) {
@@ -85,15 +96,12 @@ final class Cenario {
         }
         // O tipo da rodada sai do placar, como no motor (RG-ONZE-1, RG-ESCURINHO-1).
         TipoDeRodada tipo = configuracao.variante().regrasEspeciais().tipoDaRodada(placar);
+        List<Carta> sequenciaDeDescarte = variante.regrasDeDescarte().sequencia(vira);
         boolean comDescarte =
-                emDescarte && configuracao.variante().regrasEspeciais().permiteDescarte(tipo);
+                emDescarte && variante.regrasEspeciais().permiteDescarte(tipo) && !sequenciaDeDescarte.isEmpty();
         FaseDaRodada fase;
         if (comDescarte) {
-            fase = new FaseDaRodada.AguardandoDescarte(configuracao
-                    .variante()
-                    .regrasDeDescarte()
-                    .sequencia(Optional.of(vira))
-                    .getFirst());
+            fase = new FaseDaRodada.AguardandoDescarte(sequenciaDeDescarte.getFirst());
         } else if (tipo instanceof TipoDeRodada.DeOnze onze) {
             fase = new FaseDaRodada.DecisaoRodadaDeOnze(
                     new JogadorId(onze.equipeComOnze().valor()));
@@ -103,7 +111,7 @@ final class Cenario {
         Rodada rodada = new Rodada(
                 tipo,
                 Aposta.inicial(1),
-                Optional.of(vira),
+                vira,
                 maos,
                 baralhoRestante,
                 comDescarte ? Descarte.inicial() : Descarte.encerrado(List.of()),

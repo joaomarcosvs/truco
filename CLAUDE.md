@@ -200,7 +200,7 @@ O que isso exige do desenho de hoje:
 - [x] M7 Partida completa
 - [x] M8 Jogável (bots + CLI)
 - [x] M9 Protocolo
-- [ ] M10 Prontidão de variante
+- [x] M10 Prontidão de variante
 
 **Decisões registradas**
 - **M1** Build: Maven Wrapper com Maven 3.9.16, `maven.compiler.release` 21, `-Xlint:all` com warnings tratados como erro e versões de plugins fixadas no POM pai.
@@ -271,3 +271,10 @@ O que isso exige do desenho de hoje:
   - uma propriedade faz ida e volta com toda ação legal, todo evento e toda visão de 200 partidas aleatórias inteiras;
   - outro teste cobre as entradas inválidas.
 - **M9** Ficam para o servidor o envelope das mensagens de rede (tipo da mensagem, id da partida, versão do protocolo) e a resposta a uma ação rejeitada (`MotivoDeRejeicao`).
+- **M10** O motor passou no teste de prontidão sem nenhuma mudança: a variante de teste `ManilhasFixas` é só uma nova `VarianteDeRegras`. Ela fica em `truco-core/src/test`, no pacote `regras.manilhasfixas`, e tem:
+  - manilhas fixas (4♣ > 7♥ > A♠ > 7♦, como no Mineiro);
+  - nenhuma vira (`usaVira` falso) e nenhum descarte (sequência vazia);
+  - o resto do paulista, reaproveitado pelas interfaces: baralho, escada, rodadas especiais e pontos.
+
+  O `ProntidaoDeVarianteTest` joga com ela em cenários exatos e em 200 partidas aleatórias inteiras: elas terminam, sem vira nem descarte, com as 40 cartas e só com ações legais. Testes de mutação confirmam que um motor que presumisse vira ou descarte falharia. O `Cenario` dos testes ganhou `semVira(variante)`.
+- **M10** Observação para quando o Mineiro vier: as regras de vaza do paulista recebem a ordem de força, mas a classe é package-private. Para reaproveitá-las com outra ordem, a variante de teste delega ao paulista quantas cartas, encoberta, quem abre e desfecho, e reescreve só a comparação das cartas (`RegrasDeVaza.resultado`). Vale tornar essa comparação reutilizável, por exemplo com uma fábrica pública de regras de vaza que receba a `OrdemDeForca`, em vez de copiá-la.
