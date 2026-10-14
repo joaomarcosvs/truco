@@ -1,7 +1,7 @@
 package io.github.joaomarcosvs.truco.acao;
 
 /**
- * Desiste da rodada. Em resposta a um pedido de aumento, quem pediu ganha o valor anterior ao pedido (RG-AUM-3,
- * RG-AUM-4); na própria vez, o adversário ganha o valor atual da rodada (RG-AUM-6).
+ * Desiste da rodada. Só vale em resposta a um pedido de aumento, e então quem pediu ganha o valor anterior ao pedido
+ * (RG-AUM-3, RG-AUM-4), ou na decisão da Rodada de Onze (RG-ONZE-1). Na própria vez não se corre (RG-AUM-6).
  */
 public record Correr() implements Acao {}

@@ -7,9 +7,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
-import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
+import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
 import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,8 +23,9 @@ class BotAleatorioTest {
 
     private static final VisaoDoJogador VISAO = MOTOR.visaoDe(MOTOR.novaPartida(configuracao(2026)), ANA);
 
-    private static final List<Acao> LEGAIS =
-            List.of(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2), new PedirAumento(), new Correr());
+    /** As ações legais na própria vez, na 2ª vaza, com duas cartas na mão. */
+    private static final List<Acao> LEGAIS = List.of(
+            new JogarCarta(0), new JogarCarta(1), new JogarEncoberta(0), new JogarEncoberta(1), new PedirAumento());
 
     private static List<Acao> escolhas(BotAleatorio bot, int quantas) {
         List<Acao> escolhas = new ArrayList<>();
@@ -62,7 +64,8 @@ class BotAleatorioTest {
     @Test
     @DisplayName("Com uma única ação legal, escolhe essa ação")
     void umaSoAcao() {
-        assertThat(new BotAleatorio(1).decidir(VISAO, List.of(new Correr()))).isEqualTo(new Correr());
+        assertThat(new BotAleatorio(1).decidir(VISAO, List.of(new RecusarDescarte())))
+                .isEqualTo(new RecusarDescarte());
     }
 
     @Test

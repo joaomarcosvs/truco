@@ -9,7 +9,6 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.BETO;
 import static io.github.joaomarcosvs.truco.partida.Partidas.MOTOR;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
@@ -59,8 +58,7 @@ class RejeicaoTest {
                         new JogarCarta(1),
                         new JogarEncoberta(0),
                         new JogarEncoberta(1),
-                        new PedirAumento(),
-                        new Correr());
+                        new PedirAumento());
         assertThat(MOTOR.aplicar(mesa.estado(), BETO, new JogarCarta(2))).isEqualTo(new Rejeitada(ACAO_INVALIDA));
     }
 }

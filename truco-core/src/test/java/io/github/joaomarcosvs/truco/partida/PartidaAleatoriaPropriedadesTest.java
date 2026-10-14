@@ -173,6 +173,28 @@ class PartidaAleatoriaPropriedadesTest {
     }
 
     @Property(tries = 100)
+    @Label("RG-AUM-6: só se corre respondendo a um pedido de aumento ou na decisão da Rodada de Onze, e quem responde"
+            + " sempre pode correr")
+    void correrSoDeUmPedidoOuNaOnze(@ForAll long seed, @ForAll long sementeDasEscolhas) {
+        for (Passo passo : jogarAteOFim(seed, sementeDasEscolhas)) {
+            FaseDaRodada fase = passo.antes().rodada().fase();
+            for (JogadorId jogador : List.of(ANA, BETO)) {
+                boolean podeCorrer = MOTOR.acoesLegais(passo.antes(), jogador).contains(new Correr());
+                boolean deveCorrer = switch (fase) {
+                    case FaseDaRodada.AguardandoRespostaDeAumento resposta ->
+                        resposta.respondedor().equals(jogador);
+                    case FaseDaRodada.DecisaoRodadaDeOnze decisao ->
+                        decisao.jogador().equals(jogador);
+                    default -> false;
+                };
+                assertThat(podeCorrer)
+                        .as("%s pode correr na fase %s", jogador, fase)
+                        .isEqualTo(deveCorrer);
+            }
+        }
+    }
+
+    @Property(tries = 100)
     @Label("RG-VIS-1 a RG-VIS-3: em partidas inteiras, nada vaza, inclusive a própria mão na Escurinho, e as 40"
             + " cartas se conservam")
     void nadaVazaEmPartidasInteiras(@ForAll long seed, @ForAll long sementeDasEscolhas) {

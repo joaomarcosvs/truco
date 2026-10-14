@@ -105,9 +105,16 @@ class FimDePartidaTest {
     }
 
     @Test
-    @DisplayName("RG-FIM-1: a partida também termina quando o adversário corre e entrega os pontos que faltavam")
+    @DisplayName("RG-FIM-1: a partida também termina quando o adversário corre de um aumento e entrega os pontos que"
+            + " faltavam")
     void terminarPorCorrida() {
-        MesaDeTeste mesa = mesa(9, 4).pedirAumento(BETO).aceitar(ANA).correr(BETO);
+        // A rodada vale 3; Ana pede seis e Beto corre: Ana ganha 3 e chega a 12.
+        MesaDeTeste mesa = mesa(9, 4)
+                .pedirAumento(BETO)
+                .aceitar(ANA)
+                .jogar(BETO, "3♠")
+                .pedirAumento(ANA)
+                .correr(BETO);
 
         assertThat(mesa.eventos(RodadaFinalizada.class)).containsExactly(new RodadaFinalizada(1, EQUIPE_DA_ANA, 3));
         assertThat(mesa.estado().rodada().fase()).isEqualTo(new FaseDaRodada.PartidaFinalizada(EQUIPE_DA_ANA));

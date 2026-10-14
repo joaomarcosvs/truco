@@ -109,10 +109,8 @@ final class Tela {
         if (decidindoARodadaDeOnze(visao)) {
             return especiais.valorAoCorrerDaRodadaDeOnze(); // RG-ONZE-1
         }
-        return visao.aposta()
-                .pedidoPendente()
-                .map(pendente -> escada.valorAoCorrer(pendente.nivelProposto())) // RG-AUM-4
-                .orElseGet(() -> escada.valorAoDesistir(visao.aposta().valor())); // RG-AUM-6
+        // RG-AUM-4; fora da Onze, só se corre de um pedido de aumento (RG-AUM-6).
+        return escada.valorAoCorrer(pendente(visao).nivelProposto());
     }
 
     /** Na Rodada de Onze, antes da decisão e depois do descarte, quem tem 11 decide se joga ou corre (RG-ONZE-1). */

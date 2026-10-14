@@ -118,7 +118,7 @@ Cada regra tem um ID (`RG-...`). Todo teste de regra cita o ID.
   | doze | 9 pontos |
 
 - **RG-AUM-5 [DEFINIDA]** **Direito de aumentar:** depois de um aumento aceito, só quem aceitou pode pedir o próximo nível. Quem pediu espera. Os direitos se alternam a cada aumento.
-- **RG-AUM-6 [DEFINIDA]** Quem corre na própria vez, sem pedido pendente, entrega a rodada ao adversário pelo valor atual da rodada.
+- **RG-AUM-6 [DEFINIDA]** Não se corre na própria vez. Só se corre em dois casos: ao responder a um pedido de aumento (RG-AUM-3, RG-AUM-4) e, na Rodada de Onze, ao decidir não jogar (RG-ONZE-1). Quem acha as próprias cartas fracas precisa jogá-las. Como na Rodada de Onze (depois da decisão) e na Rodada Escurinho não há aumento (RG-AUM-7), nelas ninguém corre.
 - **RG-AUM-7 [DEFINIDA]** Aumentos podem ser pedidos em qualquer vaza (1ª, 2ª ou 3ª), exceto na Rodada de Onze e na Rodada Escurinho.
 
 ## 8. Rodada de Onze e Rodada Escurinho
@@ -180,6 +180,7 @@ Preencha a coluna "Decisão" e o Claude Code atualiza `OpcoesTrucoPaulista` e os
 - X pede truco, Y aceita (rodada vale 3), Y pede seis, X corre → Y ganha 3 pontos.
 - X pede truco, Y aceita (vale 3), Y pede seis, X aceita (vale 6) → agora só X pode pedir nove (RG-AUM-5).
 - X pede truco, Y responde com seis (aceita e aumenta); X pode aceitar, correr ou pedir nove.
+- X acha as próprias cartas fracas, mas ninguém pediu aumento → X não pode correr: precisa jogar (RG-AUM-6).
 - Rodada valendo 12: ninguém pode pedir aumento, e quem vencer a rodada vence a partida, tenha pedido o doze ou não (RG-AUM-1).
 
 **Descarte**

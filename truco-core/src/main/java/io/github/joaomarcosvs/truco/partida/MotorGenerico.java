@@ -110,7 +110,7 @@ final class MotorGenerico implements MotorDeTruco {
                         && escada.podeAumentar(rodada.aposta(), configuracao.equipeDe(jogador))) {
                     acoes.add(new PedirAumento());
                 }
-                acoes.add(new Correr()); // RG-AUM-6
+                // RG-AUM-6: na própria vez não se corre; só respondendo a um aumento ou na decisão da Onze.
             }
             case AguardandoRespostaDeAumento resposta
             when resposta.respondedor().equals(jogador) -> {
@@ -345,15 +345,11 @@ final class MotorGenerico implements MotorDeTruco {
             int pontos = configuracao.variante().regrasEspeciais().valorAoCorrerDaRodadaDeOnze();
             return darVitoria(estado, equipeAdversaria(configuracao, jogador), pontos, eventos);
         }
-        Optional<PedidoDeAumento> pendente = rodada.aposta().pedidoPendente();
-        if (pendente.isPresent()) {
-            // RG-AUM-3 e RG-AUM-4: quem pediu ganha o valor que a rodada tinha antes do pedido.
-            int pontos = escada.valorAoCorrer(pendente.get().nivelProposto());
-            return darVitoria(estado, configuracao.equipeDe(pendente.get().pedinte()), pontos, eventos);
-        }
-        // RG-AUM-6: quem corre na própria vez entrega a rodada à equipe adversária pelo valor atual.
-        int pontos = escada.valorAoDesistir(rodada.aposta().valor());
-        return darVitoria(estado, equipeAdversaria(configuracao, jogador), pontos, eventos);
+        // RG-AUM-3 e RG-AUM-4: fora da Onze, só se corre de um pedido (RG-AUM-6), e quem pediu ganha o valor que a
+        // rodada tinha antes do pedido.
+        PedidoDeAumento pendente = rodada.aposta().pedidoPendente().orElseThrow();
+        int pontos = escada.valorAoCorrer(pendente.nivelProposto());
+        return darVitoria(estado, configuracao.equipeDe(pendente.pedinte()), pontos, eventos);
     }
 
     /**

@@ -64,7 +64,6 @@ class TrucoCliTest {
                         "  2) Jogar 3♣",
                         "  3) Jogar J♦",
                         "  4) Pedir aumento para 3",
-                        "  5) Correr (bot ganha 1 ponto)",
                         "> ",
                         "Partida interrompida. Seed: 2026.");
     }

@@ -152,19 +152,17 @@ class TelaTest {
     }
 
     @Test
-    @DisplayName("Na sua vez: jogar aberta ou encoberta, pedir aumento e correr, com o efeito de cada opção")
+    @DisplayName("Na sua vez: jogar aberta ou encoberta e pedir aumento, com o efeito de cada opção")
     void opcoesNaVez() {
         VisaoDoJogador visao = new Visao().montar();
 
         assertThat(tela.opcao(new JogarCarta(0), visao)).isEqualTo("Jogar 2♥");
         assertThat(tela.opcao(new JogarEncoberta(1), visao)).isEqualTo("Jogar 3♣ encoberta");
         assertThat(tela.opcao(new PedirAumento(), visao)).isEqualTo("Pedir aumento para 3");
-        assertThat(tela.opcao(new Correr(), visao)).isEqualTo("Correr (bot ganha 1 ponto)");
 
         Visao valendoTres = new Visao();
         valendoTres.aposta = new Aposta(3, Optional.of(SUA_EQUIPE), Optional.empty());
         assertThat(tela.opcao(new PedirAumento(), valendoTres.montar())).isEqualTo("Pedir aumento para 6");
-        assertThat(tela.opcao(new Correr(), valendoTres.montar())).isEqualTo("Correr (bot ganha 3 pontos)");
     }
 
     @Test
@@ -189,11 +187,6 @@ class TelaTest {
 
         assertThat(tela.opcao(new Aceitar(), decisao.montar())).isEqualTo("Jogar a Rodada de Onze (vale 3)");
         assertThat(tela.opcao(new Correr(), decisao.montar())).isEqualTo("Correr (bot ganha 1 ponto)");
-
-        Visao jogando = new Visao();
-        jogando.tipo = new TipoDeRodada.DeOnze(SUA_EQUIPE, true);
-        jogando.aposta = new Aposta(3, Optional.empty(), Optional.empty());
-        assertThat(tela.opcao(new Correr(), jogando.montar())).isEqualTo("Correr (bot ganha 3 pontos)");
     }
 
     @Test

@@ -107,7 +107,7 @@ public sealed interface Acao permits JogarCarta, JogarEncoberta, Descartar, Recu
 - `Descartar(indiceNaMao)`, `RecusarDescarte()`: só na fase de descarte. Todos respondem a cada carta da vez: só o dono dela pode `Descartar`, e para os outros `RecusarDescarte` é passar. O passo só se resolve quando todos responderam (RG-DESC-10).
 - `PedirAumento()`: o nível é sempre o próximo da escada. Se houver pedido pendente, significa "aceito e aumento".
 - `Aceitar()`: aceita um aumento ou, na Rodada de Onze, decide jogar.
-- `Correr()`: recusa um aumento, desiste da rodada na própria vez ou, na Rodada de Onze, decide correr.
+- `Correr()`: recusa um aumento ou, na Rodada de Onze, decide não jogar. Na própria vez não se corre (RG-AUM-6).
 
 **Eventos** (sealed `Evento`, cada um com `Visibilidade`: `PUBLICO` ou `PRIVADO(jogador)`)
 `RodadaIniciada`, `CartasDistribuidas` (privado), `CartaDescartada` (público, com a carta), `CartaRecebidaPorDescarte` (privado), `DescarteEncerrado` (público), `CartaJogada`, `CartaEncobertaJogada` (público, sem a identidade), `VazaFinalizada`, `AumentoPedido`, `AumentoAceito`, `JogadorCorreu`, `RodadaFinalizada`, `RodadaAnulada`, `PlacarAtualizado`, `PartidaFinalizada`, `RodadaDeOnzeIniciada`, `RodadaEscurinhoIniciada`.
@@ -194,7 +194,7 @@ O que isso exige do desenho de hoje:
 - [x] M1 Fundação
 - [x] M2 Cartas e força (RG-CARTAS-3 será testada no M3, junto com a distribuição)
 - [x] M3 Rodada sem aumentos (vencer com 12 pontos, de RG-PARTIDA-1, será testado no M7; correr, de RG-PARTIDA-5, no M4/M5)
-- [x] M4 Aumentos (correr na própria vez, de RG-AUM-6, entra no M5; as exceções de RG-AUM-7 e "rodada de 12 vence a partida", de RG-AUM-1, no M7)
+- [x] M4 Aumentos (a RG-AUM-6, sobre correr, entra no M5; as exceções de RG-AUM-7 e "rodada de 12 vence a partida", de RG-AUM-1, no M7)
 - [x] M5 Carta encoberta e correr (a proibição de encoberta na Rodada Escurinho entra no M7)
 - [x] M6 Descarte (RG-DESC-9, sem descarte na Rodada Escurinho, e o descarte na Rodada de Onze entram no M7)
 - [x] M7 Partida completa
@@ -225,18 +225,18 @@ O que isso exige do desenho de hoje:
 - **M4** Responde a um pedido o adversário à direita de quem pediu; num "pedir mais", responde quem tinha pedido, e o motor emite `AumentoAceito` e `AumentoPedido`. Aceito o aumento, a vez volta para quem ia jogar, que pode pedir o nível seguinte na hora se tiver o direito. `Correr` por enquanto só responde a um pedido.
 - **M5** `Jogada` ganhou `encoberta` (fábricas `Jogada.aberta` e `Jogada.encoberta`), e o estado do servidor guarda a carta encoberta. `Acao` ganhou `JogarEncoberta`; `Evento` ganhou `CartaEncobertaJogada`, sem a carta. `RegrasDeVaza.permiteEncoberta(numeroDaVaza)` libera a encoberta da 2ª vaza em diante, e o resultado da vaza só compara as cartas abertas (todas encobertas: empate).
 - **M5** A `VisaoDoJogador` não expõe mais `Vaza` e `Jogada` do modelo: usa `VazaVisivel` e `JogadaVisivel(jogador, Optional<Carta>, encoberta)`, e a carta encoberta só aparece para quem a jogou, inclusive depois da rodada.
-- **M5** `Correr` também vale na própria vez, sem pedido pendente: a equipe adversária ganha `EscadaDeApostas.valorAoDesistir(valor atual)`.
+- **M5** ~~`Correr` também vale na própria vez~~: revogada depois do M8, ver a correção da RG-AUM-6 abaixo.
 - **M6** Descarte pela opção A (aprovada): a cada carta da vez, todos respondem, e o passo só se resolve quando todos responderam. Assim, para quem não tem a carta, "o dono recusou" e "ninguém tinha" geram as mesmas visões, ações e eventos (há teste disso). Esconder o tempo de resposta fica com o servidor (por exemplo, uma janela igual para todos).
 - **M6** `FaseDaRodada.AguardandoDescarte(cartaDaVez)`; `Acao` ganhou `Descartar` e `RecusarDescarte`; `Evento` ganhou `CartaDescartada` (pública, com quem descartou), `CartaRecebidaPorDescarte` (privada) e `DescarteEncerrado`. A `Rodada` guarda um `Descarte` (descartadas, se acabou, quem já respondeu e se o dono descarta), e a visão mostra as descartadas e a carta da vez, com `vezDe` vazio no descarte.
 - **M6** `RegrasDeDescarte.sequencia(vira)` dá a sequência (vazia = sem descarte); a carta da vez é a seguinte depois das descartadas. A carta comprada sai do topo do baralho restante e fica na posição da descartada. Sem baralho restante, ninguém pode descartar (caso-limite que as regras não cobrem).
 - **M6** O descarte entra em `proximaFase` antes de tudo (RG-DESC-2), e toda mudança de estado da rodada passa por `MotorGenerico.comRodada`, que recalcula a fase.
 - **M7** A `VarianteDeRegras` ganhou duas peças. `RegrasEspeciais` diz o tipo da rodada pelo placar, o que cada tipo permite (aumento, encoberta, descarte, mão visível) e os valores da Rodada de Onze (3 ao jogar, 1 ao correr). `PontuacaoDaPartida` dá os pontos para vencer (12). O `TipoDeRodada` fica na `Rodada` e na `VisaoDoJogador`. `Evento` ganhou `RodadaDeOnzeIniciada`, `RodadaEscurinhoIniciada` e `PartidaFinalizada(vencedora, placar)`.
 - **M7** Ordem em `proximaFase`: fim da partida, descarte, `DecisaoRodadaDeOnze`, pedido pendente e, por último, as vazas. Assim, na Rodada de Onze, o descarte vem antes da decisão (RG-ONZE-3). Decide quem tem 11, mesmo que não seja quem abre a 1ª vaza. `Aceitar` (jogar) emite `AumentoAceito(jogador, 3)`, e `Correr` dá 1 ponto ao adversário.
-- **M7** Suposição, porque as regras não tratam do caso: depois de decidir jogar a Rodada de Onze, e na Escurinho, `Correr` na própria vez continua valendo (RG-AUM-6). Quem corre entrega o valor da rodada: 3 na Onze e 1 na Escurinho, o que na Escurinho encerra a partida.
+- **M7** ~~Suposição de que se corre na própria vez depois de decidir jogar a Onze e na Escurinho~~: revogada com a correção da RG-AUM-6 abaixo.
 - **M7** Fim de partida: quando um lado chega aos pontos para vencer, o `aplicar` emite `PartidaFinalizada` depois de `PlacarAtualizado` e não distribui outra rodada. O estado guarda a rodada final, com a última vaza, na fase `PartidaFinalizada(vencedora)`. Depois disso, `acoesLegais` volta vazia, `aplicar` devolve `Rejeitada(PARTIDA_FINALIZADA)` (motivo novo) e a visão mostra `vencedoraDaPartida`.
 - **M7** Na Escurinho não há `CartasDistribuidas`, e a visão traz a `mao` vazia (só `cartasNaMao`). O jogador escolhe a carta pela posição, e a carta jogada é revelada a todos.
 - **M7** Testes de partida inteira: propriedades (a partida sempre termina, as restrições da Onze e da Escurinho valem, nada vaza, nem a própria mão na Escurinho) e um golden de partida completa (seed 2026) que passa pela Rodada de Onze e pela Escurinho.
-- **M8** `BotAleatorio(seed)` escolhe entre as ações legais, todas com a mesma chance, usando um `java.util.Random`. O algoritmo do `Random` é fixo na especificação do Java, então a mesma seed dá as mesmas escolhas em qualquer JVM. Como adversário ele é fraco, porque corre com frequência. É de propósito: bots melhores estão fora do escopo, e o uniforme passa por todas as ações no fuzz.
+- **M8** `BotAleatorio(seed)` escolhe entre as ações legais, todas com a mesma chance, usando um `java.util.Random`. O algoritmo do `Random` é fixo na especificação do Java, então a mesma seed dá as mesmas escolhas em qualquer JVM. Como adversário ele é fraco, porque joga ao acaso e aceita ou corre de aumentos sem critério. É de propósito: bots melhores estão fora do escopo, e o uniforme passa por todas as ações no fuzz.
 - **M8** O `Arbitro` (em `truco-bots`) conduz uma partida local. A cada passo, o primeiro jogador da mesa com ações legais recebe a própria visão e escolhe; uma ação fora das legais é bug da estratégia (`IllegalStateException`). A cada ação aplicada, ele avisa um `ObservadorDaPartida`. A CLI e o fuzz usam o árbitro; o servidor terá o próprio laço.
 - **M8** O fuzz global (`FuzzGlobalTest`, em `truco-bots`) usa só a API pública e roda dois lotes de partidas de `BotAleatorio` contra `BotAleatorio`:
   - 2.000 partidas conferem que toda partida termina, que as ações da escada valem, que o placar nunca diminui, que as 40 cartas se conservam e, a cada passo, que uma ação sorteada é aceita se e só se for legal;
@@ -250,3 +250,9 @@ O que isso exige do desenho de hoje:
 
   As cartas aparecem com os símbolos de naipe se o charset do terminal os codifica; senão, com letras (c, e, o, p).
 - **M8** O jar executável sai do `maven-shade-plugin` 3.6.2, em `truco-cli/target/truco-cli.jar`. Ele é separado do jar do módulo: se o substituísse, um build sem `clean` reprocessaria o próprio resultado. Só o manifesto da CLI entra no jar.
+- **Correção da RG-AUM-6 (depois do M8)** O documento de regras dizia que dava para correr na própria vez, e o motor fazia isso. Não dá: só se corre respondendo a um pedido de aumento ou, na Rodada de Onze, ao decidir não jogar. Quem acha as cartas fracas tem que jogá-las. Por isso:
+  - `Correr` saiu das ações legais da vez de jogar;
+  - `EscadaDeApostas.valorAoDesistir` foi removida;
+  - depois de decidir jogar a Onze, e na Escurinho, ninguém corre, porque nelas não há aumento.
+
+  Uma propriedade confere a regra em partidas inteiras.

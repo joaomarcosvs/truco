@@ -113,7 +113,7 @@ class ArbitroTest {
                                 fim.numeroDaRodada(),
                                 fim.placar().pontosDe(EQUIPE_DA_ANA),
                                 fim.placar().pontosDe(EQUIPE_DO_BETO)))
-                .isEqualTo("rodada 11: ana 5 x 14 beto");
+                .isEqualTo("rodada 5: ana 4 x 19 beto");
     }
 
     @Test

@@ -68,7 +68,7 @@ class RodadaEscurinhoTest {
         assertThat(estado.rodada().descarte().encerrado()).isTrue();
         assertThat(estado.rodada().fase()).isEqualTo(new AguardandoJogada(ANA));
         assertThat(MOTOR.acoesLegais(estado, ANA))
-                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2), new Correr());
+                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2));
     }
 
     @Test
@@ -95,14 +95,13 @@ class RodadaEscurinhoTest {
         MesaDeTeste mesa = mesa();
 
         assertThat(MOTOR.acoesLegais(mesa.estado(), BETO))
-                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2), new Correr());
+                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2));
         assertThat(MOTOR.aplicar(mesa.estado(), BETO, new PedirAumento())).isEqualTo(new Rejeitada(ACAO_INVALIDA));
 
         mesa.jogar(BETO, "3♠").jogar(ANA, "4♣");
 
         // Na 2ª vaza, a carta encoberta seria permitida numa rodada normal (RG-ENC-1).
-        assertThat(MOTOR.acoesLegais(mesa.estado(), BETO))
-                .containsExactly(new JogarCarta(0), new JogarCarta(1), new Correr());
+        assertThat(MOTOR.acoesLegais(mesa.estado(), BETO)).containsExactly(new JogarCarta(0), new JogarCarta(1));
         assertThat(MOTOR.aplicar(mesa.estado(), BETO, new JogarEncoberta(0))).isEqualTo(new Rejeitada(ACAO_INVALIDA));
     }
 
@@ -122,12 +121,16 @@ class RodadaEscurinhoTest {
     }
 
     @Test
-    @DisplayName("RG-ESCURINHO-1 e RG-AUM-6: quem corre na Escurinho entrega a rodada e, com ela, a partida")
-    void correrNaEscurinho() {
-        MesaDeTeste mesa = mesa().correr(BETO);
+    @DisplayName("RG-ESCURINHO-1 e RG-AUM-6: na Escurinho ninguém corre, porque não há aumento")
+    void ninguemCorreNaEscurinho() {
+        MesaDeTeste mesa = mesa();
 
-        assertThat(mesa.eventos(RodadaFinalizada.class)).containsExactly(new RodadaFinalizada(1, EQUIPE_DA_ANA, 1));
-        assertThat(mesa.estado().rodada().fase()).isEqualTo(new FaseDaRodada.PartidaFinalizada(EQUIPE_DA_ANA));
+        assertThat(MOTOR.aplicar(mesa.estado(), BETO, new Correr())).isEqualTo(new Rejeitada(ACAO_INVALIDA));
+
+        mesa.jogar(BETO, "3♠");
+
+        assertThat(MOTOR.acoesLegais(mesa.estado(), ANA)).doesNotContain(new Correr());
+        assertThat(MOTOR.aplicar(mesa.estado(), ANA, new Correr())).isEqualTo(new Rejeitada(ACAO_INVALIDA));
     }
 
     @Test

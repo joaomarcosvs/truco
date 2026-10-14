@@ -166,7 +166,7 @@ class RodadaDeOnzeTest {
         MesaDeTeste mesa = mesa(8, 11).aceitar(BETO);
 
         assertThat(MOTOR.acoesLegais(mesa.estado(), BETO))
-                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2), new Correr());
+                .containsExactly(new JogarCarta(0), new JogarCarta(1), new JogarCarta(2));
         assertThat(MOTOR.aplicar(mesa.estado(), BETO, new PedirAumento())).isEqualTo(new Rejeitada(ACAO_INVALIDA));
 
         mesa.jogar(BETO, "3♠");
@@ -200,11 +200,17 @@ class RodadaDeOnzeTest {
     }
 
     @Test
-    @DisplayName("RG-ONZE-1 e RG-AUM-6: depois de decidir jogar, quem corre na própria vez entrega os 3 pontos")
-    void correrDepoisDeDecidirJogar() {
-        MesaDeTeste mesa = mesa(5, 11).aceitar(BETO).correr(BETO);
+    @DisplayName(
+            "RG-ONZE-1 e RG-AUM-6: depois de decidir jogar, ninguém corre, porque na Rodada de Onze não há aumento")
+    void ninguemCorreDepoisDeDecidirJogar() {
+        MesaDeTeste mesa = mesa(5, 11).aceitar(BETO);
 
-        assertThat(mesa.eventos(RodadaFinalizada.class)).containsExactly(new RodadaFinalizada(1, EQUIPE_DA_ANA, 3));
-        assertThat(mesa.estado().placar().pontosDe(EQUIPE_DA_ANA)).isEqualTo(8);
+        assertThat(MOTOR.acoesLegais(mesa.estado(), BETO)).doesNotContain(new Correr());
+        assertThat(MOTOR.aplicar(mesa.estado(), BETO, new Correr())).isEqualTo(new Rejeitada(ACAO_INVALIDA));
+
+        mesa.jogar(BETO, "3♠");
+
+        assertThat(MOTOR.acoesLegais(mesa.estado(), ANA)).doesNotContain(new Correr());
+        assertThat(MOTOR.aplicar(mesa.estado(), ANA, new Correr())).isEqualTo(new Rejeitada(ACAO_INVALIDA));
     }
 }
