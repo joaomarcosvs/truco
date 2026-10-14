@@ -1,0 +1,200 @@
+:root {
+  --feltro: #1f5d3a;
+  --feltro-escuro: #123d26;
+  --madeira: #2a1a10;
+  --texto: #f4f1e8;
+  --texto-suave: #c9d6cc;
+  --carta: #fdfcf8;
+  --carta-borda: #d8d2c4;
+  --vermelho: #c62828;
+  --preto: #1b1b1b;
+  --verso-a: #23396b;
+  --verso-b: #2f4c8f;
+  --destaque: #f2c14e;
+  --perigo: #e57373;
+  --sombra: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --raio: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--texto);
+  background: radial-gradient(ellipse at center, var(--feltro) 0%, var(--feltro-escuro) 75%, #0b2416 100%);
+  background-color: var(--feltro-escuro);
+}
+
+.topo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.topo h1 { margin: 0; font-size: 1.3rem; letter-spacing: 0.02em; }
+
+.placar { flex: 1; font-size: 1.1rem; font-weight: 600; text-align: center; }
+
+.botao {
+  font: inherit;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  color: var(--texto);
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.botao:hover:not(:disabled) { background: rgba(0, 0, 0, 0.45); }
+.botao:disabled { opacity: 0.5; cursor: default; }
+.botao.principal { background: var(--destaque); color: #2b2100; border-color: var(--destaque); font-weight: 600; }
+.botao.principal:hover:not(:disabled) { filter: brightness(1.08); background: var(--destaque); }
+.botao.aumento { border-color: var(--destaque); color: var(--destaque); font-weight: 600; }
+.botao.perigo { border-color: var(--perigo); color: var(--perigo); }
+
+.jogo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  max-width: 1100px;
+  margin: 16px auto;
+  padding: 0 16px;
+}
+
+.mesa {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 8px solid var(--madeira);
+  border-radius: 24px;
+  background: rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
+}
+
+.lado { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+.rotulo { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--texto-suave); }
+
+.mao { display: flex; gap: 10px; min-height: 104px; align-items: center; justify-content: center; flex-wrap: wrap; }
+
+.centro { display: flex; flex-direction: column; gap: 10px; }
+
+.info { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 30px; }
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 0.9rem;
+}
+.chip.especial { background: var(--destaque); color: #2b2100; font-weight: 600; }
+.chip.pedido { background: #6a1b1b; }
+
+.tabuleiro { display: flex; gap: 18px; align-items: center; justify-content: center; flex-wrap: wrap; }
+
+.vira { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+.vazas { display: flex; gap: 12px; }
+
+.vaza {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 86px;
+  padding: 8px;
+  border-radius: var(--raio);
+  background: rgba(0, 0, 0, 0.18);
+}
+.vaza.atual { outline: 2px dashed rgba(255, 255, 255, 0.35); }
+.vaza .resultado { font-size: 0.78rem; color: var(--texto-suave); min-height: 1em; text-align: center; }
+
+.carta {
+  position: relative;
+  width: 64px;
+  height: 92px;
+  border-radius: 8px;
+  border: 1px solid var(--carta-borda);
+  background: var(--carta);
+  color: var(--preto);
+  box-shadow: var(--sombra);
+  font-weight: 700;
+  user-select: none;
+}
+.carta.vermelha { color: var(--vermelho); }
+.carta .canto { position: absolute; top: 4px; left: 6px; font-size: 0.95rem; line-height: 1; text-align: center; white-space: pre-line; }
+.carta .canto.baixo { top: auto; left: auto; bottom: 4px; right: 6px; transform: rotate(180deg); }
+.carta .meio { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.9rem; }
+.carta.pequena { width: 46px; height: 66px; }
+.carta.pequena .meio { font-size: 1.3rem; }
+.carta.pequena .canto { font-size: 0.75rem; }
+.carta.encoberta { opacity: 0.75; }
+.carta .selo {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #333;
+  color: #fff;
+}
+
+.carta.verso {
+  border-color: #16244a;
+  background: repeating-linear-gradient(45deg, var(--verso-a) 0 6px, var(--verso-b) 6px 12px);
+}
+.carta.verso .meio { color: rgba(255, 255, 255, 0.85); font-size: 1.2rem; }
+
+.carta.vazia { background: transparent; border: 1px dashed rgba(255, 255, 255, 0.25); box-shadow: none; }
+
+.carta.jogavel { cursor: pointer; transition: transform 0.12s; }
+.carta.jogavel:hover { transform: translateY(-8px); }
+.carta.jogavel:focus-visible { outline: 3px solid var(--destaque); outline-offset: 2px; }
+
+.acoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; min-height: 40px; }
+
+.aviso {
+  padding: 10px 14px;
+  border-radius: var(--raio);
+  background: rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+.aviso.fim { background: var(--destaque); color: #2b2100; font-size: 1.15rem; font-weight: 700; }
+.aviso .botao { margin-left: 12px; }
+
+.historico {
+  padding: 12px;
+  border-radius: var(--raio);
+  background: rgba(0, 0, 0, 0.3);
+  max-height: 640px;
+  overflow-y: auto;
+}
+.historico h2 { margin: 0 0 8px; font-size: 1rem; }
+.historico ol { margin: 0; padding: 0; list-style: none; font-size: 0.9rem; line-height: 1.45; }
+.historico li { padding: 1px 0; }
+.historico li.rodada { margin-top: 10px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.2); font-weight: 600; }
+.historico li.fim { color: var(--destaque); font-weight: 700; }
+.historico li.nota { color: var(--texto-suave); font-style: italic; }
+
+.rodape { text-align: center; padding: 8px 16px 20px; font-size: 0.85rem; color: var(--texto-suave); }
+.rodape a { color: var(--texto); }
+
+@media (max-width: 860px) {
+  .topo { justify-content: space-between; }
+  .topo h1 { font-size: 1.1rem; }
+  .placar { order: 3; flex-basis: 100%; }
+  .jogo { grid-template-columns: minmax(0, 1fr); }
+  .historico { max-height: 260px; }
+  .carta { width: 54px; height: 78px; }
+  .carta .meio { font-size: 1.5rem; }
+  .vaza { min-width: 70px; }
+}

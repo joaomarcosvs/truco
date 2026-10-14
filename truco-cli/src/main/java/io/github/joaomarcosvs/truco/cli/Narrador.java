@@ -35,7 +35,7 @@ import java.util.stream.Stream;
  * Conta a partida em português, do ponto de vista de um jogador ("você"). Só deve receber os eventos que esse jogador
  * pode ver ({@code Evento.visivelPara}).
  */
-final class Narrador {
+public final class Narrador {
 
     private final JogadorId voce;
     private final Map<JogadorId, String> nomes;
@@ -46,7 +46,7 @@ final class Narrador {
      * @param voce o jogador do ponto de vista da narração
      * @param nomes como cada jogador é chamado no meio de uma frase, como "você" e "bot"
      */
-    Narrador(JogadorId voce, Map<JogadorId, String> nomes, ConfiguracaoDaPartida configuracao, Notacao notacao) {
+    public Narrador(JogadorId voce, Map<JogadorId, String> nomes, ConfiguracaoDaPartida configuracao, Notacao notacao) {
         this.voce = voce;
         this.nomes = Map.copyOf(nomes);
         this.configuracao = configuracao;
@@ -54,7 +54,7 @@ final class Narrador {
     }
 
     /** Uma frase sobre o evento, começando com maiúscula. */
-    String descrever(Evento evento) {
+    public String descrever(Evento evento) {
         String frase = switch (evento) {
             case RodadaIniciada iniciada ->
                 "rodada %d: %s dá as cartas%s."

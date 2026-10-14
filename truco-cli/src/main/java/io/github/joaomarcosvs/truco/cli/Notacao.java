@@ -7,7 +7,7 @@ import java.nio.charset.CharsetEncoder;
 import java.util.Arrays;
 
 /** Como as cartas aparecem no terminal. */
-enum Notacao {
+public enum Notacao {
 
     /** Com os símbolos de naipe: "A♥", "10♠". */
     SIMBOLOS,
@@ -15,7 +15,7 @@ enum Notacao {
     /** Com letras no lugar dos naipes, para terminais que não mostram os símbolos: "Ac", "10e". */
     LETRAS;
 
-    String de(Carta carta) {
+    public String de(Carta carta) {
         return switch (this) {
             case SIMBOLOS -> carta.toString();
             case LETRAS -> carta.valor().simbolo() + letra(carta.naipe());
@@ -26,7 +26,7 @@ enum Notacao {
      * A notação que o terminal consegue mostrar. O terminal do Windows usa por padrão uma página de código sem os
      * símbolos de naipe (a não ser com {@code chcp 65001}).
      */
-    static Notacao para(Charset charset) {
+    public static Notacao para(Charset charset) {
         if (!charset.canEncode()) {
             return LETRAS;
         }

@@ -21,6 +21,7 @@ Tudo o que for feito agora serve para entregar um core **completo, correto, test
 - Bot aleatório e CLI de desenvolvimento para jogar e testar
 - Testes (unitários, de cenário e de propriedade)
 - Módulo de protocolo (DTOs + JSON) no penúltimo marco
+- Na branch `feat/frontend-web`: um frontend web **de teste** (`truco-web`) para jogar contra o bot no navegador e publicar de graça no Render (`docs/frontend-web.md`). É uma ferramenta de desenvolvimento, como a CLI, e não o servidor de verdade.
 
 **Fora do escopo agora: não implemente nem crie esqueleto**
 - Servidor, rede, WebSocket
@@ -39,6 +40,7 @@ Se uma tarefa parecer exigir algo fora do escopo, pare e pergunte.
 - JUnit 5, AssertJ, jqwik (testes de propriedade)
 - Comandos: `./mvnw -q test` · `./mvnw -q -pl truco-core test` · `./mvnw -q verify` · `./mvnw spotless:apply` (formata o código)
 - Jogar contra o bot: `./mvnw -q package -DskipTests` e depois `java -jar truco-cli/target/truco-cli.jar [--seed N] [--letras]`
+- No navegador: `java -jar truco-web/target/truco-web.jar` e abrir http://localhost:8080
 - groupId: `io.github.joaomarcosvs` · pacote base: `io.github.joaomarcosvs.truco` (bots em `...truco.bots`, CLI em `...truco.cli`)
 - CI: GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw verify` a cada push na `main` e em pull requests
 
@@ -48,11 +50,12 @@ truco/
 ├─ truco-bots/       estratégias de jogo (começa com BotAleatorio)
 ├─ truco-cli/        cliente de console para desenvolvimento
 ├─ truco-protocol/   DTOs + JSON (criado só no marco M9)
+├─ truco-web/        frontend web de teste (branch feat/frontend-web), com Dockerfile e render.yaml na raiz
 ├─ docs/
 └─ CLAUDE.md
 ```
 
-Dependências entre módulos: `cli → bots → core` e `protocol → core`. **O core não depende de nada além do JDK.**
+Dependências entre módulos: `cli → bots → core`, `protocol → core` e `web → cli, protocol`. **O core não depende de nada além do JDK.**
 Futuros, fora deste repo ou deste escopo: `truco-server` (Java) e o cliente Unity.
 
 ## 4. Princípios inegociáveis
@@ -278,3 +281,9 @@ O que isso exige do desenho de hoje:
 
   O `ProntidaoDeVarianteTest` joga com ela em cenários exatos e em 200 partidas aleatórias inteiras: elas terminam, sem vira nem descarte, com as 40 cartas e só com ações legais. Testes de mutação confirmam que um motor que presumisse vira ou descarte falharia. O `Cenario` dos testes ganhou `semVira(variante)`.
 - **M10** Observação para quando o Mineiro vier: as regras de vaza do paulista recebem a ordem de força, mas a classe é package-private. Para reaproveitá-las com outra ordem, a variante de teste delega ao paulista quantas cartas, encoberta, quem abre e desfecho, e reescreve só a comparação das cartas (`RegrasDeVaza.resultado`). Vale tornar essa comparação reutilizável, por exemplo com uma fábrica pública de regras de vaza que receba a `OrdemDeForca`, em vez de copiá-la.
+- **Frontend web (branch `feat/frontend-web`)** O `truco-web` é uma página para jogar contra o bot no navegador; o guia está em `docs/frontend-web.md`.
+  - O servidor é HTTP, só com o JDK (`com.sun.net.httpserver`), e **não guarda nada**. A página manda a seed e as suas jogadas a cada pedido, e `PartidaReconstituida` refaz a partida, o que funciona porque o core e o bot são determinísticos. Assim a partida sobrevive ao servidor gratuito dormir ou reiniciar.
+  - A resposta traz só a sua visão e os eventos que você pode ver, no formato do protocolo, com o texto da CLI em cada evento e ação. Por isso `Narrador`, `Tela` e `Notacao` da CLI ficaram públicos.
+  - A página (HTML, CSS e JS, sem build) só desenha e manda jogadas, sem nenhuma regra. No descarte, quando a única opção é passar, o servidor passa sozinho, como a CLI.
+  - A hospedagem gratuita é no Render, com o `Dockerfile` e o `render.yaml` da raiz.
+  - Os testes cobrem a reconstituição, o servidor por HTTP (página, API, erros, partida inteira) e uma propriedade de que a resposta, inclusive os textos, nunca mostra uma carta oculta.

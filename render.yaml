@@ -1,0 +1,12 @@
+# Blueprint do Render (https://render.com/docs/blueprint-spec): o frontend web de teste no plano gratuito.
+# O passo a passo está em docs/frontend-web.md.
+services:
+  - type: web
+    name: truco
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: feat/frontend-web
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /saude
+    autoDeployTrigger: commit

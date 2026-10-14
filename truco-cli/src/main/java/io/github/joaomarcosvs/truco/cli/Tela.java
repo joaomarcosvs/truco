@@ -25,20 +25,20 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 /** Desenha a mesa como o jogador a vê e descreve as ações legais como opções de menu. */
-final class Tela {
+public final class Tela {
 
     private final Narrador narrador;
     private final EscadaDeApostas escada;
     private final RegrasEspeciais especiais;
 
-    Tela(Narrador narrador, VarianteDeRegras variante) {
+    public Tela(Narrador narrador, VarianteDeRegras variante) {
         this.narrador = narrador;
         this.escada = variante.escadaDeApostas();
         this.especiais = variante.regrasEspeciais();
     }
 
     /** A mesa, uma informação por linha: rodada e placar, rodada especial, aumento pendente, descarte, vazas e mãos. */
-    List<String> mesa(VisaoDoJogador visao) {
+    public List<String> mesa(VisaoDoJogador visao) {
         List<String> linhas = new ArrayList<>();
         linhas.add("Rodada %d | vale %d | %s%s"
                 .formatted(
@@ -82,7 +82,7 @@ final class Tela {
     }
 
     /** A ação como opção de menu, com o efeito que ela tem agora. */
-    String opcao(Acao acao, VisaoDoJogador visao) {
+    public String opcao(Acao acao, VisaoDoJogador visao) {
         return switch (acao) {
             case JogarCarta(int indiceNaMao) -> "Jogar " + cartaNaPosicao(visao, indiceNaMao);
             case JogarEncoberta(int indiceNaMao) -> "Jogar " + cartaNaPosicao(visao, indiceNaMao) + " encoberta";

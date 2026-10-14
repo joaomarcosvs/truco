@@ -1,0 +1,7 @@
+# O que não entra na imagem: builds locais, git e arquivos de IDE.
+**/target
+.git
+.idea
+*.iml
+.vscode
+.claude

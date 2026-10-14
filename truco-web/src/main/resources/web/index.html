@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Truco Paulista</title>
+  <link rel="stylesheet" href="estilo.css">
+  <script src="mesa.js" defer></script>
+</head>
+<body>
+  <header class="topo">
+    <h1>Truco Paulista</h1>
+    <div class="placar" id="placar" aria-live="polite"></div>
+    <button class="botao" id="nova" type="button">Nova partida</button>
+  </header>
+
+  <main class="jogo">
+    <section class="mesa" aria-label="Mesa">
+      <div class="lado">
+        <span class="rotulo">Bot</span>
+        <div class="mao" id="mao-bot"></div>
+      </div>
+
+      <div class="centro">
+        <div class="info" id="info"></div>
+        <div class="tabuleiro">
+          <figure class="vira">
+            <figcaption class="rotulo">Vira</figcaption>
+            <div id="vira"></div>
+          </figure>
+          <div class="vazas" id="vazas"></div>
+        </div>
+      </div>
+
+      <div class="lado">
+        <div class="mao" id="mao-voce"></div>
+        <span class="rotulo">Você</span>
+      </div>
+
+      <div class="acoes" id="acoes" aria-label="O que você faz"></div>
+      <div class="aviso" id="aviso" role="status" hidden></div>
+    </section>
+
+    <aside class="historico">
+      <h2>Histórico</h2>
+      <ol id="historico" aria-live="polite"></ol>
+    </aside>
+  </main>
+
+  <footer class="rodape">
+    Seed <span id="seed">?</span> · <a id="repetir" href="./">jogar esta partida de novo</a> ·
+    você contra um bot que joga ao acaso
+  </footer>
+</body>
+</html>

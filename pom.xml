@@ -18,6 +18,7 @@
         <module>truco-bots</module>
         <module>truco-cli</module>
         <module>truco-protocol</module>
+        <module>truco-web</module>
     </modules>
 
     <properties>
@@ -58,6 +59,16 @@
             <dependency>
                 <groupId>io.github.joaomarcosvs</groupId>
                 <artifactId>truco-bots</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.joaomarcosvs</groupId>
+                <artifactId>truco-cli</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.joaomarcosvs</groupId>
+                <artifactId>truco-protocol</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
