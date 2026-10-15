@@ -9,6 +9,7 @@ const CHAVE_MODO = 'truco-modo';
 const CHAVE_BOT = 'truco-partida';
 const CHAVE_SALA = 'truco-sala';
 const PAUSA = 550;
+const PAUSA_ULTIMA_CARTA = 1600;
 const PAUSA_FIM_DE_RODADA = 1900;
 const INTERVALO_DA_SALA = 1000;
 // Só para os rótulos dos botões de aumento; as regras ficam no servidor.
@@ -32,6 +33,7 @@ const estado = {
   // Mesa
   ocupado: false,
   ultima: null, // { acoes, visao }: o que está desenhado agora
+  ultimaJogada: null, // a sua última ação, para mostrar a sua encoberta no fim da rodada
   rodadaNoConsole: null,
   placar: null,
 };
@@ -129,6 +131,12 @@ async function mostrar(passos, acoesLegais, animar) {
     if (animar && i > 0) await esperar(PAUSA);
     passo.eventos.forEach(registrar);
     if (animar && terminaRodada(passo)) {
+      // A última carta da rodada chega junto com a rodada seguinte: antes do resumo, a mesa mostra como a rodada acabou.
+      const fim = mesaNoFimDaRodada(visao, passo.eventos);
+      if (fim) {
+        desenharMesa(fim);
+        await esperar(PAUSA_ULTIMA_CARTA);
+      }
       mostrarResumo(passo);
       await esperar(PAUSA_FIM_DE_RODADA);
       esconderAviso();
@@ -153,7 +161,42 @@ async function ateFicarLivre() {
   while (estado.ocupado) await esperar(50);
 }
 
+/**
+ * A mesa depois da última carta da rodada, montada com a visão de antes e os eventos dessa carta: a jogada entra na
+ * vaza, e a vaza ganha o resultado. Vazio se a rodada acabou sem carta (alguém correu).
+ */
+function mesaNoFimDaRodada(anterior, eventos) {
+  const evento = (tipo) => eventos.map((e) => e.evento).find((e) => tipo.includes(e.tipo));
+  const jogou = evento(['CartaJogada', 'CartaEncobertaJogada']);
+  if (!anterior || !jogou) return null;
+  const encoberta = jogou.tipo === 'CartaEncobertaJogada';
+  let carta = encoberta ? null : jogou.carta;
+  const mao = [...anterior.mao];
+  if (jogou.jogador === estado.eu) {
+    // A sua encoberta você vê: é a carta da posição que você escolheu.
+    const indice = encoberta
+      ? estado.ultimaJogada?.indiceNaMao ?? -1
+      : mao.findIndex((c) => c.valor === carta.valor && c.naipe === carta.naipe);
+    if (indice >= 0 && indice < mao.length) {
+      if (encoberta) carta = mao[indice];
+      mao.splice(indice, 1);
+    }
+  }
+  const jogadas = [...anterior.vazaAtual, { jogador: jogou.jogador, carta, encoberta }];
+  const fimDaVaza = evento(['VazaFinalizada']);
+  return {
+    ...anterior,
+    mao,
+    cartasNaMao: { ...anterior.cartasNaMao, [jogou.jogador]: Math.max(0, (anterior.cartasNaMao[jogou.jogador] ?? 1) - 1) },
+    vazas: fimDaVaza ? [...anterior.vazas, { jogadas, resultado: fimDaVaza.resultado }] : anterior.vazas,
+    vazaAtual: fimDaVaza ? [] : jogadas,
+    aposta: { ...anterior.aposta, pedidoPendente: null },
+    cartaDaVezNoDescarte: null,
+  };
+}
+
 function jogar(acao) {
+  estado.ultimaJogada = acao;
   if (estado.modo === 'bot') jogarContraOBot(acao);
   else if (estado.modo === 'sala') jogarNaSala(acao);
 }
