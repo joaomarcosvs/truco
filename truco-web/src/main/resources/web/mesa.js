@@ -1,17 +1,40 @@
 'use strict';
 
 // A página só conhece a sua visão e os eventos que você pode ver, no formato de docs/protocolo.md, como o cliente Unity.
-// O servidor não guarda nada: a página guarda a seed e as suas jogadas, e manda tudo a cada pedido.
+// Contra o bot, o servidor não guarda nada: a página guarda a seed e as suas jogadas, e manda tudo a cada pedido.
+// Contra um amigo, a partida fica numa sala, na memória do servidor: a página guarda o código e o seu token, pergunta
+// o que mudou a cada segundo e manda as suas jogadas.
 
-const API = 'api/partida';
-const CHAVE = 'truco-partida';
+const CHAVE_MODO = 'truco-modo';
+const CHAVE_BOT = 'truco-partida';
+const CHAVE_SALA = 'truco-sala';
 const PAUSA = 550;
 const PAUSA_FIM_DE_RODADA = 1900;
-const NOMES = { voce: 'você', bot: 'bot' };
+const INTERVALO_DA_SALA = 1000;
 // Só para os rótulos dos botões de aumento; as regras ficam no servidor.
 const NIVEIS = { 3: 'Truco', 6: 'Seis', 9: 'Nove', 12: 'Doze' };
 
-const estado = { seed: null, acoes: [], ocupado: false, ultima: null, rodadaNoConsole: null, placar: null };
+const estado = {
+  modo: null, // 'bot' ou 'sala'
+  eu: 'voce',
+  outro: 'bot',
+  nomes: { voce: 'você', bot: 'bot' },
+  geracao: 0, // muda a cada partida nova, para ignorar respostas da anterior
+  // Contra o bot
+  seed: null,
+  acoes: [],
+  // Na sala
+  sala: null, // { codigo, token, voce }
+  cursor: 0,
+  situacao: null,
+  esperaNaTela: false,
+  erroNaTela: false,
+  // Mesa
+  ocupado: false,
+  ultima: null, // { acoes, visao }: o que está desenhado agora
+  rodadaNoConsole: null,
+  placar: null,
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -23,96 +46,351 @@ function elemento(tag, classe, texto) {
 }
 
 const esperar = (ms) => new Promise((pronto) => setTimeout(pronto, ms));
-const nome = (id) => NOMES[id] ?? id;
+const nome = (id) => estado.nomes[id] ?? id;
 const comMaiuscula = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1);
 const plural = (n, palavra) => `${n} ${palavra}${n === 1 ? '' : 's'}`;
 
-// ---------- Guardar a partida no navegador (para sobreviver a um recarregar) ----------
+// ---------- Guardar no navegador (para sobreviver a um recarregar) ----------
 
-function salvar() {
+function guardar(chave, valor) {
   try {
-    localStorage.setItem(CHAVE, JSON.stringify({ seed: estado.seed, acoes: estado.acoes }));
+    localStorage.setItem(chave, JSON.stringify(valor));
   } catch (e) {
     // Sem armazenamento (aba anônima, por exemplo): a partida só não sobrevive a um recarregar.
   }
 }
 
-function carregar() {
+function ler(chave) {
   try {
-    const salvo = JSON.parse(localStorage.getItem(CHAVE));
-    if (salvo && Number.isSafeInteger(salvo.seed) && Array.isArray(salvo.acoes)) return salvo;
+    return JSON.parse(localStorage.getItem(chave));
   } catch (e) {
-    // Ignora o que estiver salvo de forma inválida.
+    return null; // Ignora o que estiver salvo de forma inválida.
   }
-  return null;
+}
+
+function esquecer(chave) {
+  try {
+    localStorage.removeItem(chave);
+  } catch (e) {
+    // Nada a fazer.
+  }
+}
+
+function botSalvo() {
+  const salvo = ler(CHAVE_BOT);
+  return salvo && Number.isSafeInteger(salvo.seed) && Array.isArray(salvo.acoes) ? salvo : null;
+}
+
+function salaSalva() {
+  const salva = ler(CHAVE_SALA);
+  return salva && typeof salva.codigo === 'string' && typeof salva.token === 'string' && typeof salva.voce === 'string'
+    ? salva
+    : null;
 }
 
 // ---------- Conversa com o servidor ----------
 
-async function pedir(corpo) {
+class ErroDoServidor extends Error {
+  constructor(mensagem, status) {
+    super(mensagem);
+    this.status = status;
+  }
+}
+
+async function pedir(url, { metodo = 'GET', corpo, token } = {}) {
   const demorando = setTimeout(
     () => avisar([elemento('p', '', 'Acordando o servidor… No plano gratuito ele dorme quando ninguém joga, e o primeiro acesso pode levar até um minuto.')]),
     2000,
   );
+  const cabecalhos = {};
+  if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json';
+  if (token) cabecalhos.Authorization = `Bearer ${token}`;
   try {
-    const resposta = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+    const resposta = await fetch(url, {
+      method: metodo,
+      headers: cabecalhos,
+      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+    });
     const json = await resposta.json().catch(() => ({}));
-    if (!resposta.ok) throw new Error(json.erro || `O servidor respondeu ${resposta.status}`);
+    if (!resposta.ok) throw new ErroDoServidor(json.erro || `O servidor respondeu ${resposta.status}`, resposta.status);
     return json;
   } catch (erro) {
-    if (erro instanceof TypeError) throw new Error('Não foi possível falar com o servidor. Tente de novo.');
+    if (erro instanceof TypeError) throw new ErroDoServidor('Não foi possível falar com o servidor. Tente de novo.', 0);
     throw erro;
   } finally {
     clearTimeout(demorando);
   }
 }
 
-async function executar(corpo, animar) {
-  estado.ocupado = true;
-  desenharAcoes([]);
-  $('dica').textContent = '';
-  try {
-    const resposta = await pedir(corpo);
-    esconderAviso();
-    estado.seed = resposta.seed;
-    salvar();
-    atualizarSeed();
-    for (const [i, passo] of resposta.passos.entries()) {
-      if (animar && i > 0) await esperar(PAUSA);
-      passo.eventos.forEach(registrar);
-      if (animar && terminaRodada(passo)) {
-        mostrarResumo(passo);
-        await esperar(PAUSA_FIM_DE_RODADA);
-        esconderAviso();
-      }
-      desenharMesa(passo.visao);
+/** Mostra os passos um a um (eventos no histórico, mesa depois de cada passo) e desenha as ações. */
+async function mostrar(passos, acoesLegais, animar) {
+  let visao = estado.ultima?.visao ?? null;
+  for (const [i, passo] of passos.entries()) {
+    if (animar && i > 0) await esperar(PAUSA);
+    passo.eventos.forEach(registrar);
+    if (animar && terminaRodada(passo)) {
+      mostrarResumo(passo);
+      await esperar(PAUSA_FIM_DE_RODADA);
+      esconderAviso();
     }
-    estado.ultima = resposta;
-    desenharAcoes(resposta.acoesLegais, resposta.passos.at(-1).visao);
-    return true;
-  } catch (erro) {
-    avisar([elemento('p', '', erro.message)], 'erro');
-    if (estado.ultima) desenharAcoes(estado.ultima.acoesLegais, estado.ultima.passos.at(-1).visao);
-    return false;
+    visao = passo.visao;
+    desenharMesa(visao);
+  }
+  estado.ultima = { acoes: acoesLegais, visao };
+  desenharAcoes(acoesLegais, visao);
+}
+
+async function ocupado(tarefa) {
+  estado.ocupado = true;
+  try {
+    return await tarefa();
   } finally {
     estado.ocupado = false;
   }
 }
 
-async function novaPartida(seed) {
-  estado.acoes = [];
+async function ateFicarLivre() {
+  while (estado.ocupado) await esperar(50);
+}
+
+function jogar(acao) {
+  if (estado.modo === 'bot') jogarContraOBot(acao);
+  else if (estado.modo === 'sala') jogarNaSala(acao);
+}
+
+// ---------- Começar uma partida ----------
+
+function prepararPartida(modo, eu, outro, nomes) {
+  estado.geracao += 1;
+  estado.modo = modo;
+  estado.eu = eu;
+  estado.outro = outro;
+  estado.nomes = nomes;
   estado.ultima = null;
   estado.placar = null;
   estado.rodadaNoConsole = null;
+  estado.esperaNaTela = false;
+  estado.erroNaTela = false;
+  guardar(CHAVE_MODO, modo);
+
+  const nomeDoOutro = comMaiuscula(nomes[outro]);
+  $('nome-no-placar').textContent = nomeDoOutro;
+  $('nome-adversario').textContent = nomeDoOutro;
+  $('avatar-adversario').textContent = nomeDoOutro.charAt(0);
+  $('pontos-voce').textContent = '0';
+  $('pontos-adversario').textContent = '0';
   $('historico').replaceChildren();
-  await executar(seed === null ? { acoes: [] } : { seed, acoes: [] }, true);
+  ['mao-adversario', 'mao-voce', 'vira', 'vazas', 'info', 'acoes'].forEach((id) => $(id).replaceChildren());
+  $('cartas-adversario').textContent = '';
+  $('dica').textContent = '';
+  esconderAviso();
+  mostrarJogo();
 }
 
-async function jogar(acao) {
+function emAndamento() {
+  const acabou = Boolean(estado.ultima?.visao?.vencedoraDaPartida);
+  if (estado.modo === 'bot') return estado.acoes.length > 0 && !acabou;
+  if (estado.modo === 'sala') return estado.situacao === 'jogando' && !acabou;
+  return false;
+}
+
+function podeTrocarDePartida() {
+  return !emAndamento() || confirm('Abandonar a partida em andamento?');
+}
+
+// ---------- Contra o bot ----------
+
+async function novaPartidaContraOBot(seed) {
+  prepararPartida('bot', 'voce', 'bot', { voce: 'você', bot: 'bot' });
+  estado.acoes = [];
+  await executarContraOBot(seed === null ? { acoes: [] } : { seed, acoes: [] }, true);
+}
+
+async function retomarContraOBot(salvo) {
+  prepararPartida('bot', 'voce', 'bot', { voce: 'você', bot: 'bot' });
+  estado.acoes = salvo.acoes;
+  nota('Partida retomada de onde você parou.');
+  const deuCerto = await executarContraOBot({ seed: salvo.seed, acoes: salvo.acoes }, false);
+  if (!deuCerto) await novaPartidaContraOBot(null);
+}
+
+async function executarContraOBot(corpo, animar) {
+  const geracao = estado.geracao;
+  return ocupado(async () => {
+    desenharAcoes([], null);
+    $('dica').textContent = '';
+    try {
+      const resposta = await pedir('api/partida', { metodo: 'POST', corpo });
+      if (geracao !== estado.geracao) return false;
+      esconderAviso();
+      estado.seed = resposta.seed;
+      guardar(CHAVE_BOT, { seed: estado.seed, acoes: estado.acoes });
+      $('console-info').replaceChildren(
+        'Seed ', elemento('strong', '', String(estado.seed)), ' · ', link(`?seed=${estado.seed}`, 'jogar esta partida de novo'),
+      );
+      await mostrar(resposta.passos, resposta.acoesLegais, animar);
+      return true;
+    } catch (erro) {
+      avisar([elemento('p', '', erro.message)], 'erro');
+      if (estado.ultima) desenharAcoes(estado.ultima.acoes, estado.ultima.visao);
+      return false;
+    }
+  });
+}
+
+async function jogarContraOBot(acao) {
   if (estado.ocupado) return;
   estado.acoes.push(acao);
-  const deuCerto = await executar({ seed: estado.seed, acoes: estado.acoes }, true);
+  const deuCerto = await executarContraOBot({ seed: estado.seed, acoes: estado.acoes }, true);
   if (!deuCerto) estado.acoes.pop();
+}
+
+// ---------- Contra um amigo, numa sala ----------
+
+async function criarSala() {
+  try {
+    const sala = await pedir('api/salas', { metodo: 'POST' });
+    entrarNaSala(sala);
+  } catch (erro) {
+    mostrarInicio(erro.message);
+  }
+}
+
+/** Abre a sala do código: com o token guardado, volta para ela; sem ele, entra como convidado. */
+async function abrirSala(digitado) {
+  const codigo = digitado.replace(/[\s-]/g, '').toUpperCase();
+  const salva = salaSalva();
+  if (salva && salva.codigo === codigo) {
+    entrarNaSala(salva);
+    return;
+  }
+  try {
+    const sala = await pedir(`api/salas/${encodeURIComponent(codigo)}/entrar`, { metodo: 'POST' });
+    entrarNaSala(sala);
+  } catch (erro) {
+    mostrarInicio(erro.message);
+  }
+}
+
+function entrarNaSala(sala) {
+  const outro = sala.voce === 'anfitriao' ? 'convidado' : 'anfitriao';
+  prepararPartida('sala', sala.voce, outro, { [sala.voce]: 'você', [outro]: 'adversário' });
+  estado.sala = { codigo: sala.codigo, token: sala.token, voce: sala.voce };
+  estado.cursor = 0;
+  estado.situacao = null;
+  guardar(CHAVE_SALA, estado.sala);
+  $('console-info').replaceChildren('Sala ', elemento('strong', '', sala.codigo));
+  acompanharSala(estado.geracao);
+}
+
+/** Pergunta ao servidor o que mudou, a cada segundo, até a partida acabar ou outra começar. */
+async function acompanharSala(geracao) {
+  while (estado.modo === 'sala' && estado.geracao === geracao) {
+    if (!estado.ocupado) await atualizarSala(geracao);
+    if (estado.situacao === 'finalizada') return;
+    await esperar(INTERVALO_DA_SALA);
+  }
+}
+
+async function atualizarSala(geracao) {
+  await ocupado(async () => {
+    const { codigo, token } = estado.sala;
+    try {
+      const resposta = await pedir(`api/salas/${codigo}?desde=${estado.cursor}`, { token });
+      if (geracao === estado.geracao) await processarSala(resposta);
+    } catch (erro) {
+      if (geracao === estado.geracao) tratarErroDaSala(erro);
+    }
+  });
+}
+
+async function processarSala(resposta) {
+  if (estado.erroNaTela) {
+    esconderAviso();
+    estado.erroNaTela = false;
+  }
+  estado.situacao = resposta.situacao;
+  if (resposta.situacao === 'esperando-adversario') {
+    mostrarEspera();
+    return;
+  }
+  if (estado.esperaNaTela) {
+    esconderAviso();
+    estado.esperaNaTela = false;
+  }
+  if (resposta.passos.length > 0 || !estado.ultima) {
+    desenharAcoes([], null);
+    // Ao voltar para a sala, o histórico inteiro chega de uma vez: sem animação.
+    await mostrar(resposta.passos, resposta.acoesLegais, estado.cursor > 0);
+  }
+  estado.cursor = resposta.cursor;
+}
+
+async function jogarNaSala(acao) {
+  const geracao = estado.geracao;
+  const cursorVisto = estado.cursor;
+  await ateFicarLivre();
+  if (geracao !== estado.geracao) return;
+  if (estado.cursor !== cursorVisto) {
+    nota('O adversário agiu antes da sua jogada. Veja a mesa e jogue de novo.');
+    return;
+  }
+  await ocupado(async () => {
+    desenharAcoes([], null);
+    const { codigo, token } = estado.sala;
+    try {
+      const resposta = await pedir(`api/salas/${codigo}/jogadas`, { metodo: 'POST', token, corpo: { acao, cursor: cursorVisto } });
+      if (geracao === estado.geracao) await processarSala(resposta);
+    } catch (erro) {
+      if (geracao !== estado.geracao) return;
+      if (erro.status === 409) {
+        nota('O adversário agiu antes da sua jogada. Veja a mesa e jogue de novo.');
+      } else {
+        tratarErroDaSala(erro);
+      }
+      if (estado.ultima) desenharAcoes(estado.ultima.acoes, estado.ultima.visao);
+    }
+  });
+  if (geracao === estado.geracao && estado.cursor === cursorVisto) await atualizarSala(geracao);
+}
+
+function tratarErroDaSala(erro) {
+  if (erro.status === 404 || erro.status === 401) {
+    // A sala expirou ou o servidor reiniciou: não há o que retomar.
+    esquecer(CHAVE_SALA);
+    estado.modo = null;
+    estado.geracao += 1;
+    mostrarInicio(erro.message);
+    return;
+  }
+  avisar([elemento('p', '', erro.message)], 'erro');
+  estado.erroNaTela = true;
+}
+
+function mostrarEspera() {
+  if (estado.esperaNaTela) return;
+  estado.esperaNaTela = true;
+  const endereco = new URL(location.pathname, location.origin);
+  endereco.searchParams.set('sala', estado.sala.codigo);
+  const copiar = elemento('button', 'botao aumento', 'Copiar link');
+  copiar.type = 'button';
+  copiar.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(endereco.href);
+      copiar.textContent = 'Link copiado!';
+    } catch (e) {
+      copiar.textContent = 'Copie o link ao lado';
+    }
+  });
+  const linkDaSala = elemento('div', 'link-da-sala');
+  linkDaSala.append(elemento('code', '', endereco.href), copiar);
+  avisar([
+    elemento('p', 'rotulo-da-sala', 'Sala'),
+    elemento('h3', 'codigo-da-sala', estado.sala.codigo),
+    elemento('p', '', 'Mande o link para o seu amigo. A partida começa quando ele entrar.'),
+    linkDaSala,
+    elemento('p', 'esperando', 'Esperando seu amigo'),
+  ], 'espera');
 }
 
 // ---------- Mesa ----------
@@ -120,9 +398,9 @@ async function jogar(acao) {
 function desenharMesa(visao) {
   atualizarPlacar(visao.placar);
 
-  const cartasDoBot = visao.cartasNaMao.bot ?? 0;
-  $('cartas-bot').textContent = cartasDoBot === 0 ? 'sem cartas na mão' : `${plural(cartasDoBot, 'carta')} na mão`;
-  $('mao-bot').replaceChildren(...Array.from({ length: cartasDoBot }, () => Baralho.verso('pequena')));
+  const cartasDoOutro = visao.cartasNaMao[estado.outro] ?? 0;
+  $('cartas-adversario').textContent = cartasDoOutro === 0 ? 'sem cartas na mão' : `${plural(cartasDoOutro, 'carta')} na mão`;
+  $('mao-adversario').replaceChildren(...Array.from({ length: cartasDoOutro }, () => Baralho.verso('pequena')));
 
   desenharInfo(visao);
 
@@ -140,7 +418,7 @@ function desenharMesa(visao) {
     suaMao.replaceChildren(...visao.mao.map((c) => slot(Baralho.carta(c, 'grande'))));
   } else {
     // Na Rodada Escurinho você não vê as próprias cartas, só as posições.
-    const quantas = visao.cartasNaMao.voce ?? 0;
+    const quantas = visao.cartasNaMao[estado.eu] ?? 0;
     suaMao.replaceChildren(...Array.from({ length: quantas }, (_, i) => slot(Baralho.verso('grande', String(i + 1)))));
   }
 }
@@ -182,11 +460,18 @@ function desenharInfo(visao) {
   }
 }
 
+/** A classe de cor de um jogador: você em dourado, o outro em azul. */
+function lado(id) {
+  if (id === estado.eu) return 'voce';
+  if (id === estado.outro) return 'adversario';
+  return 'geral';
+}
+
 function desenharVaza(vaza, numero) {
   const el = elemento('div', `vaza${vaza.atual ? ' atual' : ''}`);
   el.append(elemento('span', 'rotulo', `${numero}ª vaza`));
   const par = elemento('div', 'par');
-  for (const jogador of ['bot', 'voce']) {
+  for (const jogador of [estado.outro, estado.eu]) {
     const jogada = vaza.jogadas.find((j) => j.jogador === jogador);
     if (!jogada) {
       par.append(elemento('div', 'lugar'));
@@ -201,8 +486,8 @@ function desenharVaza(vaza, numero) {
   el.append(par);
   const resultado = elemento('span', 'resultado');
   if (vaza.resultado?.tipo === 'Vencida') {
-    resultado.textContent = vaza.resultado.jogador === 'voce' ? 'você' : 'bot';
-    resultado.classList.add(vaza.resultado.jogador === 'voce' ? 'voce' : 'bot');
+    resultado.textContent = nome(vaza.resultado.jogador);
+    resultado.classList.add(lado(vaza.resultado.jogador));
   } else if (vaza.resultado?.tipo === 'Empatada') {
     resultado.textContent = 'empate';
     resultado.classList.add('empate');
@@ -292,11 +577,19 @@ function rotulo(acao, texto) {
 }
 
 function dica(acoes, visao) {
-  if (!visao || acoes.length === 0) return visao?.vencedoraDaPartida ? 'Fim de partida.' : '';
+  if (!visao) return '';
+  if (visao.vencedoraDaPartida) return 'Fim de partida.';
+  const outro = nome(estado.outro);
+  if (acoes.length === 0) return estado.modo === 'sala' ? 'Esperando o adversário…' : '';
   const tipos = new Set(acoes.map(({ acao }) => acao.tipo));
-  if (visao.aposta.pedidoPendente) return 'O bot pediu aumento: aceite, corra ou peça mais.';
-  if (visao.cartaDaVezNoDescarte) return 'Descarte: você tem a carta da vez. Descarte-a para comprar outra, ou não descarte.';
-  if (visao.tipoDaRodada.tipo === 'DeOnze' && !visao.tipoDaRodada.decidiuJogar) return 'Você tem 11 pontos: jogue a Rodada de Onze (vale 3) ou corra (o bot ganha 1).';
+  if (visao.aposta.pedidoPendente) return `O ${outro} pediu aumento: aceite, corra ou peça mais.`;
+  if (tipos.has('RecusarDescarte')) return 'Descarte: você tem a carta da vez. Descarte-a para comprar outra, ou não descarte.';
+  if (tipos.has('Descartar')) {
+    return tipos.has('JogarCarta') || tipos.has('Aceitar')
+      ? 'Você tem a carta da vez: se quiser, descarte-a antes de jogar.'
+      : `Você tem a carta da vez: pode descartá-la até o ${outro} jogar.`;
+  }
+  if (visao.tipoDaRodada.tipo === 'DeOnze' && !visao.tipoDaRodada.decidiuJogar) return `Você tem 11 pontos: jogue a Rodada de Onze (vale 3) ou corra (o ${outro} ganha 1).`;
   if (tipos.has('JogarCarta')) {
     return visao.mao.length === 0 ? 'Rodada Escurinho: clique numa carta virada para jogá-la às cegas.' : 'Sua vez: clique numa carta para jogá-la.';
   }
@@ -306,24 +599,24 @@ function dica(acoes, visao) {
 // ---------- Placar ----------
 
 function atualizarPlacar(placar) {
-  for (const time of ['voce', 'bot']) {
+  const pontos = { voce: placar[estado.eu], adversario: placar[estado.outro] };
+  for (const time of ['voce', 'adversario']) {
     const el = $(`pontos-${time}`);
     const antes = estado.placar?.[time];
-    el.textContent = placar[time];
-    if (antes !== undefined && antes !== placar[time]) {
+    el.textContent = pontos[time];
+    if (antes !== undefined && antes !== pontos[time]) {
       el.classList.remove('mudou');
       void el.offsetWidth; // Reinicia a animação.
       el.classList.add('mudou');
     }
   }
-  estado.placar = { ...placar };
+  estado.placar = pontos;
 }
 
 // ---------- Histórico (console) ----------
 
 function quem(evento) {
-  const id = evento.jogador ?? evento.pedinte ?? evento.vencedora ?? evento.equipeComOnze ?? evento.resultado?.jogador;
-  return id === 'voce' || id === 'bot' ? id : 'geral';
+  return evento.jogador ?? evento.pedinte ?? evento.vencedora ?? evento.equipeComOnze ?? evento.resultado?.jogador;
 }
 
 function abrirRodadaNoConsole(titulo, resumo, vira) {
@@ -345,12 +638,12 @@ function registrar({ evento, texto }) {
     return;
   }
   if (!estado.rodadaNoConsole) abrirRodadaNoConsole('Partida', 'retomada de onde você parou');
-  const ator = quem(evento);
+  const id = quem(evento);
   const classes = {
     RodadaFinalizada: 'ponto', RodadaAnulada: 'ponto', PlacarAtualizado: 'placar', PartidaFinalizada: 'fim',
   };
-  const linha = elemento('li', `linha ${ator} ${classes[evento.tipo] ?? ''}`.trim());
-  linha.append(elemento('span', 'quem', ator === 'geral' ? '' : nome(ator)), elemento('span', 'texto', texto));
+  const linha = elemento('li', `linha ${lado(id)} ${classes[evento.tipo] ?? ''}`.trim());
+  linha.append(elemento('span', 'quem', lado(id) === 'geral' ? '' : nome(id)), elemento('span', 'texto', texto));
   estado.rodadaNoConsole.append(linha);
   const console = $('historico');
   console.scrollTop = console.scrollHeight;
@@ -361,6 +654,8 @@ function nota(texto) {
   const linha = elemento('li', 'linha nota');
   linha.append(elemento('span', 'quem', ''), elemento('span', 'texto', texto));
   estado.rodadaNoConsole.append(linha);
+  const console = $('historico');
+  console.scrollTop = console.scrollHeight;
 }
 
 // ---------- Avisos sobre a mesa ----------
@@ -390,47 +685,80 @@ function esconderAviso() {
 }
 
 function mostrarFim(visao) {
-  const voceVenceu = visao.vencedoraDaPartida === 'voce';
-  const p = visao.placar;
-  const botao = elemento('button', 'botao aumento', 'Jogar de novo');
+  const voceVenceu = visao.vencedoraDaPartida === estado.eu;
+  const p = { voce: visao.placar[estado.eu], outro: visao.placar[estado.outro] };
+  const contraOBot = estado.modo === 'bot';
+  const botao = elemento('button', 'botao aumento', contraOBot ? 'Jogar de novo' : 'Voltar ao menu');
   botao.type = 'button';
-  botao.addEventListener('click', () => novaPartida(null));
+  botao.addEventListener('click', () => (contraOBot ? novaPartidaContraOBot(null) : mostrarInicio()));
   avisar([
-    elemento('h3', '', voceVenceu ? 'Você venceu!' : 'O bot venceu'),
-    elemento('p', '', voceVenceu ? `${p.voce} a ${p.bot}` : `${p.bot} a ${p.voce}`),
+    elemento('h3', '', voceVenceu ? 'Você venceu!' : `O ${nome(estado.outro)} venceu`),
+    elemento('p', '', voceVenceu ? `${p.voce} a ${p.outro}` : `${p.outro} a ${p.voce}`),
     botao,
   ], 'fim');
 }
 
-function atualizarSeed() {
-  $('seed').textContent = estado.seed;
-  $('repetir').href = `?seed=${estado.seed}`;
+function link(href, texto) {
+  const a = elemento('a', '', texto);
+  a.href = href;
+  return a;
 }
 
-// ---------- Início ----------
+// ---------- Menu ----------
+
+function mostrarInicio(erro) {
+  $('jogo').hidden = true;
+  $('inicio').hidden = false;
+  $('continuar').hidden = estado.modo === null;
+  const aviso = $('erro-inicio');
+  aviso.textContent = erro ?? '';
+  aviso.hidden = !erro;
+}
+
+function mostrarJogo() {
+  $('inicio').hidden = true;
+  $('jogo').hidden = false;
+}
 
 $('naipes').append(...['OUROS', 'COPAS', 'ESPADAS', 'PAUS'].map(Baralho.simbolo));
 
-$('nova').addEventListener('click', () => {
-  if (estado.ocupado) return;
-  const emAndamento = estado.ultima && !estado.ultima.passos.at(-1).visao.vencedoraDaPartida && estado.acoes.length > 0;
-  if (emAndamento && !confirm('Abandonar esta partida e começar outra?')) return;
-  novaPartida(null);
+$('menu').addEventListener('click', () => mostrarInicio());
+$('continuar').addEventListener('click', mostrarJogo);
+
+$('jogar-bot').addEventListener('click', () => {
+  if (podeTrocarDePartida()) novaPartidaContraOBot(null);
+});
+
+$('criar-sala').addEventListener('click', () => {
+  if (podeTrocarDePartida()) criarSala();
+});
+
+$('entrar-sala').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const codigo = $('codigo-sala').value.trim();
+  if (codigo && podeTrocarDePartida()) abrirSala(codigo);
 });
 
 (async function comecar() {
-  const daUrl = new URLSearchParams(location.search).get('seed');
-  if (daUrl !== null && /^\d{1,15}$/.test(daUrl)) {
-    history.replaceState(null, '', location.pathname);
-    await novaPartida(Number(daUrl));
+  const parametros = new URLSearchParams(location.search);
+  const daUrl = { sala: parametros.get('sala'), seed: parametros.get('seed') };
+  if (daUrl.sala !== null || daUrl.seed !== null) history.replaceState(null, '', location.pathname);
+  if (daUrl.sala) {
+    await abrirSala(daUrl.sala);
     return;
   }
-  const salvo = carregar();
-  if (salvo) {
-    estado.acoes = salvo.acoes;
-    nota('Partida retomada de onde você parou.');
-    const deuCerto = await executar({ seed: salvo.seed, acoes: salvo.acoes }, false);
-    if (deuCerto) return;
+  if (daUrl.seed !== null && /^\d{1,15}$/.test(daUrl.seed)) {
+    await novaPartidaContraOBot(Number(daUrl.seed));
+    return;
   }
-  await novaPartida(null);
+  const modo = ler(CHAVE_MODO);
+  if (modo === 'sala' && salaSalva()) {
+    entrarNaSala(salaSalva());
+    return;
+  }
+  if (modo === 'bot' && botSalvo()) {
+    await retomarContraOBot(botSalvo());
+    return;
+  }
+  mostrarInicio();
 })();

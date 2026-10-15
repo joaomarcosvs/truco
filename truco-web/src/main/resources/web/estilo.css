@@ -24,6 +24,9 @@
 
 * { box-sizing: border-box; }
 
+/* O atributo hidden vence o display das classes. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -67,7 +70,7 @@ body {
   border: 1px solid var(--linha);
 }
 .time.voce .pontos { color: var(--ouro); }
-.time.bot .pontos { color: var(--azul); }
+.time.adversario .pontos { color: var(--azul); }
 .time .pontos.mudou { animation: pulsar 0.6s ease; }
 .meta { font-size: 0.75rem; color: var(--texto-suave); }
 
@@ -128,6 +131,93 @@ body {
 /* ---------- Salão: mesa em cima, histórico embaixo ---------- */
 
 .salao { max-width: 1040px; margin: 18px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 16px; }
+.jogo { display: flex; flex-direction: column; gap: 16px; }
+
+/* ---------- Menu: contra o bot, criar sala, entrar numa sala ---------- */
+
+.inicio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 34px 24px 30px;
+  border-radius: 28px;
+  border: 10px solid var(--madeira);
+  outline: 2px solid var(--madeira-escura);
+  background: radial-gradient(ellipse at center, var(--feltro-claro) 0%, var(--feltro) 55%, #15462d 100%);
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.45), var(--sombra);
+}
+.inicio h2 { margin: 0; font-family: var(--titulo); font-size: 1.6rem; }
+.opcoes-de-jogo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; width: 100%; max-width: 860px; }
+.opcao-de-jogo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 18px 18px 20px;
+  border: 1px solid var(--linha);
+  border-radius: var(--raio);
+  font: inherit;
+  text-align: left;
+  color: var(--texto);
+  background: var(--painel);
+  box-shadow: var(--sombra);
+}
+button.opcao-de-jogo { cursor: pointer; transition: transform 0.12s, border-color 0.15s; }
+button.opcao-de-jogo:hover { transform: translateY(-2px); border-color: rgba(242, 193, 78, 0.6); }
+button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-offset: 2px; }
+.opcao-de-jogo strong { font-family: var(--titulo); font-size: 1.2rem; color: var(--ouro); }
+.opcao-de-jogo span, .opcao-de-jogo label { font-size: 0.88rem; color: var(--texto-suave); line-height: 1.4; }
+.campo { display: flex; gap: 8px; width: 100%; margin-top: 4px; }
+.campo input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+  font: inherit;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 1.05rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--texto);
+  background: rgba(0, 0, 0, 0.35);
+}
+.campo input:focus { outline: 2px solid var(--ouro); outline-offset: 1px; }
+.campo .botao { min-width: 0; }
+.erro-inicio { margin: 0; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--vermelho); background: rgba(120, 30, 20, 0.45); }
+
+/* ---------- Sala esperando o amigo ---------- */
+
+.aviso.espera { padding: 22px 28px; }
+.aviso .rotulo-da-sala { margin: 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--texto-suave); }
+.aviso .codigo-da-sala {
+  margin: 2px 0 10px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 2.2rem;
+  letter-spacing: 0.18em;
+  color: var(--ouro);
+}
+.link-da-sala { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+.link-da-sala code {
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+  background: rgba(0, 0, 0, 0.4);
+}
+.esperando { margin: 6px 0 0; color: var(--texto-suave); }
+.esperando::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: reticencias 1.4s steps(4, end) infinite; }
+
+@keyframes reticencias {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
 
 .mesa {
   position: relative;
@@ -143,7 +233,7 @@ body {
   box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.45), var(--sombra);
 }
 
-.lado-bot { display: flex; align-items: center; justify-content: center; gap: 22px; width: 100%; }
+.lado-adversario { display: flex; align-items: center; justify-content: center; gap: 22px; width: 100%; }
 .jogador { display: flex; align-items: center; gap: 10px; }
 .jogador strong { display: block; }
 .jogador .detalhe { display: block; font-size: 0.8rem; color: var(--texto-suave); }
@@ -202,7 +292,7 @@ body {
 .vaza .par { display: flex; flex-direction: column; gap: 6px; }
 .vaza .resultado { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; min-height: 1.4em; }
 .resultado.voce { background: var(--ouro); color: #2b1d00; }
-.resultado.bot { background: var(--azul); color: #0b1a33; }
+.resultado.adversario { background: var(--azul); color: #0b1a33; }
 .resultado.empate { background: rgba(255, 255, 255, 0.2); }
 
 .lugar { width: var(--carta-pequena); aspect-ratio: 208 / 319; border: 1px dashed rgba(255, 255, 255, 0.2); border-radius: 7px; }
@@ -305,8 +395,8 @@ body {
   background: rgba(0, 0, 0, 0.25);
 }
 .console-topo h2 { margin: 0; font-family: var(--titulo); font-size: 1.05rem; font-weight: 700; }
-.console-seed { font-size: 0.78rem; color: var(--texto-suave); }
-.console-seed a { color: var(--texto); }
+.console-info { font-size: 0.78rem; color: var(--texto-suave); }
+.console-info a { color: var(--texto); }
 
 .console-linhas {
   list-style: none;
@@ -344,7 +434,7 @@ body {
 }
 .linha .quem { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; text-align: right; color: var(--texto-suave); }
 .linha.voce .quem { color: var(--ouro); }
-.linha.bot .quem { color: var(--azul); }
+.linha.adversario .quem { color: var(--azul); }
 .linha.ponto .texto { font-weight: 700; }
 .linha.placar .texto { color: var(--ouro); font-variant-numeric: tabular-nums; }
 .linha.fim .texto { font-family: var(--titulo); font-size: 1.05rem; font-weight: 700; color: var(--ouro); }
@@ -369,10 +459,13 @@ body {
   .marca h1 { font-size: 1.15rem; }
   .salao { margin: 12px auto; padding: 0 10px; }
   .mesa { padding: 14px 10px; border-width: 7px; border-radius: 20px; }
-  .lado-bot { gap: 12px; }
+  .lado-adversario { gap: 12px; }
   .centro { gap: 14px; }
   .vazas { gap: 6px; }
   .vaza { padding: 6px; }
   .mao { gap: 8px; }
   .botao { min-width: 96px; padding: 8px 14px; }
+  .inicio { padding: 24px 12px; border-width: 7px; border-radius: 20px; }
+  .opcoes-de-jogo { grid-template-columns: 1fr; }
+  .aviso .codigo-da-sala { font-size: 1.7rem; }
 }

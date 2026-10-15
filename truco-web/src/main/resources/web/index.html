@@ -17,54 +17,80 @@
     <div class="placar" aria-live="polite" aria-label="Placar">
       <div class="time voce"><span class="nome">Você</span><span class="pontos" id="pontos-voce">0</span></div>
       <span class="meta">até 12</span>
-      <div class="time bot"><span class="pontos" id="pontos-bot">0</span><span class="nome">Bot</span></div>
+      <div class="time adversario"><span class="pontos" id="pontos-adversario">0</span><span class="nome" id="nome-no-placar">Bot</span></div>
     </div>
-    <button class="botao discreto" id="nova" type="button">Nova partida</button>
+    <button class="botao discreto" id="menu" type="button">Menu</button>
   </header>
 
   <main class="salao">
-    <section class="mesa" aria-label="Mesa">
-      <div class="lado-bot">
-        <div class="jogador">
-          <span class="avatar bot" aria-hidden="true">B</span>
-          <div><strong>Bot</strong><span class="detalhe" id="cartas-bot"></span></div>
+    <section class="inicio" id="inicio" aria-labelledby="titulo-inicio" hidden>
+      <h2 id="titulo-inicio">Como você quer jogar?</h2>
+      <div class="opcoes-de-jogo">
+        <button class="opcao-de-jogo" id="jogar-bot" type="button">
+          <strong>Contra o bot</strong>
+          <span>Um bot que joga ao acaso. A partida fica no seu navegador.</span>
+        </button>
+        <button class="opcao-de-jogo" id="criar-sala" type="button">
+          <strong>Criar sala</strong>
+          <span>Você recebe um código e manda o link para um amigo.</span>
+        </button>
+        <form class="opcao-de-jogo entrar" id="entrar-sala">
+          <strong>Entrar numa sala</strong>
+          <label for="codigo-sala">Código que seu amigo mandou</label>
+          <div class="campo">
+            <input id="codigo-sala" name="codigo" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7QF2M" required>
+            <button class="botao aceitar" type="submit">Entrar</button>
+          </div>
+        </form>
+      </div>
+      <button class="botao discreto" id="continuar" type="button" hidden>Voltar para a partida</button>
+      <p class="erro-inicio" id="erro-inicio" role="alert" hidden></p>
+    </section>
+
+    <div class="jogo" id="jogo" hidden>
+      <section class="mesa" aria-label="Mesa">
+        <div class="lado-adversario">
+          <div class="jogador">
+            <span class="avatar" id="avatar-adversario" aria-hidden="true">B</span>
+            <div><strong id="nome-adversario">Bot</strong><span class="detalhe" id="cartas-adversario"></span></div>
+          </div>
+          <div class="mao leque" id="mao-adversario"></div>
         </div>
-        <div class="mao leque" id="mao-bot"></div>
-      </div>
 
-      <div class="info" id="info"></div>
+        <div class="info" id="info"></div>
 
-      <div class="centro">
-        <figure class="vira">
-          <div id="vira"></div>
-          <figcaption>Vira</figcaption>
-        </figure>
-        <div class="vazas" id="vazas"></div>
-      </div>
+        <div class="centro">
+          <figure class="vira">
+            <div id="vira"></div>
+            <figcaption>Vira</figcaption>
+          </figure>
+          <div class="vazas" id="vazas"></div>
+        </div>
 
-      <div class="lado-voce">
-        <div class="mao" id="mao-voce"></div>
-      </div>
+        <div class="lado-voce">
+          <div class="mao" id="mao-voce"></div>
+        </div>
 
-      <div class="comandos">
-        <p class="dica" id="dica" aria-live="polite"></p>
-        <div class="acoes" id="acoes" aria-label="O que você faz"></div>
-      </div>
+        <div class="comandos">
+          <p class="dica" id="dica" aria-live="polite"></p>
+          <div class="acoes" id="acoes" aria-label="O que você faz"></div>
+        </div>
 
-      <div class="aviso" id="aviso" role="status" hidden></div>
-    </section>
+        <div class="aviso" id="aviso" role="status" hidden></div>
+      </section>
 
-    <section class="console" aria-label="Histórico da partida">
-      <header class="console-topo">
-        <h2>Histórico</h2>
-        <span class="console-seed">Seed <strong id="seed">?</strong> · <a id="repetir" href="./">jogar esta partida de novo</a></span>
-      </header>
-      <ol class="console-linhas" id="historico"></ol>
-    </section>
+      <section class="console" aria-label="Histórico da partida">
+        <header class="console-topo">
+          <h2>Histórico</h2>
+          <span class="console-info" id="console-info"></span>
+        </header>
+        <ol class="console-linhas" id="historico"></ol>
+      </section>
+    </div>
   </main>
 
   <footer class="rodape">
-    <p>Você contra um bot que joga ao acaso · baralho espanhol: sota, cavalo e rei fazem as vezes de 10, Q e J</p>
+    <p>Truco Paulista de teste · baralho espanhol: sota, cavalo e rei fazem as vezes de 10, Q e J</p>
     <p class="creditos">
       Cartas: <a href="https://commons.wikimedia.org/wiki/File:Baraja_espa%C3%B1ola_completa.png" rel="noopener">“Baraja española completa”</a>,
       de Basquetteur, a partir do trabalho de Germarquezm, sob a licença

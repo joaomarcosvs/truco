@@ -3,9 +3,6 @@ package io.github.joaomarcosvs.truco.web;
 import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
 import io.github.joaomarcosvs.truco.bots.BotAleatorio;
-import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
-import io.github.joaomarcosvs.truco.evento.Evento;
-import io.github.joaomarcosvs.truco.evento.RodadaIniciada;
 import io.github.joaomarcosvs.truco.partida.Aplicada;
 import io.github.joaomarcosvs.truco.partida.ConfiguracaoDaPartida;
 import io.github.joaomarcosvs.truco.partida.Equipe;
@@ -14,7 +11,6 @@ import io.github.joaomarcosvs.truco.partida.FaseDaRodada;
 import io.github.joaomarcosvs.truco.partida.JogadorId;
 import io.github.joaomarcosvs.truco.partida.MotorDeTruco;
 import io.github.joaomarcosvs.truco.regras.paulista.TrucoPaulista;
-import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,23 +23,11 @@ final class PartidaReconstituida {
 
     static final JogadorId VOCE = new JogadorId("voce");
     static final JogadorId BOT = new JogadorId("bot");
-    static final MotorDeTruco MOTOR = MotorDeTruco.novo();
+    static final MotorDeTruco MOTOR = Passo.MOTOR;
 
     private static final List<Acao> SO_PASSAR = List.of(new RecusarDescarte());
 
     private PartidaReconstituida() {}
-
-    /** Uma ação aplicada: os eventos que você pode ver e o estado depois dela. */
-    record Passo(List<Evento> eventos, EstadoDaPartida estado) {
-
-        Passo {
-            eventos = List.copyOf(eventos);
-        }
-
-        VisaoDoJogador suaVisao() {
-            return MOTOR.visaoDe(estado, VOCE);
-        }
-    }
 
     /** O resultado de refazer a partida. */
     sealed interface Reconstituicao {}
@@ -75,7 +59,7 @@ final class PartidaReconstituida {
     static Reconstituicao reconstituir(long seed, List<Acao> suasJogadas) {
         EstadoDaPartida estado = MOTOR.novaPartida(configuracao(seed));
         BotAleatorio bot = new BotAleatorio(seed);
-        List<Passo> passos = new ArrayList<>(List.of(inicio(estado)));
+        List<Passo> passos = new ArrayList<>(List.of(Passo.inicio(VOCE, estado)));
         int proxima = 0;
         while (!(estado.rodada().fase() instanceof FaseDaRodada.PartidaFinalizada)) {
             JogadorId jogador = daVez(estado);
@@ -103,7 +87,7 @@ final class PartidaReconstituida {
             if (suaJogada) {
                 passos.clear();
             }
-            passos.add(new Passo(visiveis(aplicada.eventos()), aplicada.novoEstado()));
+            passos.add(Passo.visto(VOCE, aplicada.eventos(), aplicada.novoEstado()));
             estado = aplicada.novoEstado();
         }
         if (proxima < suasJogadas.size()) {
@@ -112,29 +96,11 @@ final class PartidaReconstituida {
         return new Reconstituida(passos);
     }
 
-    /** A 1ª rodada já vem distribuída no estado inicial, sem eventos: é contada como as seguintes. */
-    private static Passo inicio(EstadoDaPartida estado) {
-        VisaoDoJogador visao = MOTOR.visaoDe(estado, VOCE);
-        return new Passo(
-                List.of(
-                        new RodadaIniciada(
-                                visao.numeroDaRodada(),
-                                visao.carteador(),
-                                visao.aposta().valor(),
-                                visao.vira()),
-                        new CartasDistribuidas(VOCE, visao.mao())),
-                estado);
-    }
-
     /** O primeiro jogador da mesa que tem ações legais, como no Arbitro dos bots. */
     private static JogadorId daVez(EstadoDaPartida estado) {
         return estado.configuracao().jogadoresNaOrdemDaMesa().stream()
                 .filter(jogador -> !MOTOR.acoesLegais(estado, jogador).isEmpty())
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("A partida não acabou, mas ninguém pode agir"));
-    }
-
-    private static List<Evento> visiveis(List<Evento> eventos) {
-        return eventos.stream().filter(evento -> evento.visivelPara(VOCE)).toList();
     }
 }

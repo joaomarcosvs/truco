@@ -12,7 +12,7 @@
 
     <artifactId>truco-web</artifactId>
     <name>Truco :: Web</name>
-    <description>Frontend web de teste: uma página para jogar contra o bot, servida por um servidor HTTP sem estado.</description>
+    <description>Frontend web de teste: uma página para jogar contra o bot ou contra um amigo numa sala, servida por um servidor HTTP só com o JDK.</description>
 
     <dependencies>
         <dependency>

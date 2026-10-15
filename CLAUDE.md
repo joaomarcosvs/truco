@@ -21,7 +21,7 @@ Tudo o que for feito agora serve para entregar um core **completo, correto, test
 - Bot aleatório e CLI de desenvolvimento para jogar e testar
 - Testes (unitários, de cenário e de propriedade)
 - Módulo de protocolo (DTOs + JSON) no penúltimo marco
-- Na branch `feat/frontend-web`: um frontend web **de teste** (`truco-web`) para jogar contra o bot no navegador e publicar de graça no Render (`docs/frontend-web.md`). É uma ferramenta de desenvolvimento, como a CLI, e não o servidor de verdade.
+- Na branch `feat/frontend-web`: um frontend web **de teste** (`truco-web`) para jogar no navegador, contra o bot ou contra um amigo numa sala com código (só na memória do servidor), e publicar de graça no Render (`docs/frontend-web.md`). É uma ferramenta de desenvolvimento, como a CLI, e não o servidor de verdade: o que ele faz com salas não substitui o `truco-server` futuro.
 
 **Fora do escopo agora: não implemente nem crie esqueleto**
 - Servidor, rede, WebSocket
@@ -281,7 +281,7 @@ O que isso exige do desenho de hoje:
 
   O `ProntidaoDeVarianteTest` joga com ela em cenários exatos e em 200 partidas aleatórias inteiras: elas terminam, sem vira nem descarte, com as 40 cartas e só com ações legais. Testes de mutação confirmam que um motor que presumisse vira ou descarte falharia. O `Cenario` dos testes ganhou `semVira(variante)`.
 - **M10** Observação para quando o Mineiro vier: as regras de vaza do paulista recebem a ordem de força, mas a classe é package-private. Para reaproveitá-las com outra ordem, a variante de teste delega ao paulista quantas cartas, encoberta, quem abre e desfecho, e reescreve só a comparação das cartas (`RegrasDeVaza.resultado`). Vale tornar essa comparação reutilizável, por exemplo com uma fábrica pública de regras de vaza que receba a `OrdemDeForca`, em vez de copiá-la.
-- **Frontend web (branch `feat/frontend-web`)** O `truco-web` é uma página para jogar contra o bot no navegador; o guia está em `docs/frontend-web.md`.
+- **Frontend web (branch `feat/frontend-web`)** O `truco-web` é uma página para jogar no navegador, contra o bot ou contra um amigo; o guia está em `docs/frontend-web.md`.
   - O servidor é HTTP, só com o JDK (`com.sun.net.httpserver`), e **não guarda nada**. A página manda a seed e as suas jogadas a cada pedido, e `PartidaReconstituida` refaz a partida, o que funciona porque o core e o bot são determinísticos. Assim a partida sobrevive ao servidor gratuito dormir ou reiniciar.
   - A resposta traz só a sua visão e os eventos que você pode ver, no formato do protocolo, com o texto da CLI em cada evento e ação. Por isso `Narrador`, `Tela` e `Notacao` da CLI ficaram públicos.
   - A página (HTML, CSS e JS, sem build) só desenha e manda jogadas, sem nenhuma regra. No descarte, quando a única opção é passar, o servidor passa sozinho, como a CLI.
@@ -289,3 +289,9 @@ O que isso exige do desenho de hoje:
   - Os testes cobrem a reconstituição, o servidor por HTTP (página, API, erros, partida inteira) e uma propriedade de que a resposta, inclusive os textos, nunca mostra uma carta oculta.
   - A página mostra o baralho espanhol, só na aparência: paus vira bastos, e 10, Q e J viram sota, cavalo e rei, o que mantém a ordem de força. Os textos usam a `Notacao.BARALHO_ESPANHOL` ("cavalo de ouros").
   - As cartas são a folha "Baraja española completa" do Wikimedia Commons, sob CC BY-SA 3.0, sem alterações e usada como sprite CSS. O crédito fica no rodapé da página, no `cartas.js` e em `docs/frontend-web.md`. A imagem vai com cache longo; a página e os scripts, com `no-store`.
+- **Frontend web: contra um amigo** A página abre num menu: contra o bot, criar sala ou entrar numa sala. O core não mudou.
+  - `Sala` guarda na memória uma partida entre `anfitriao` e `convidado`, com a seed sorteada por `SecureRandom`, que nunca sai do servidor, porque com ela daria para calcular as cartas dos dois. `Salas` cria as salas (código de 6 caracteres sem 0, O, 1, I e L), dá a cada jogador um token de 128 bits, aceita até 100 salas e fecha as que passam 2 horas sem jogadas ou 30 minutos depois do fim. O relógio é injetado nos testes.
+  - A página pergunta a cada segundo o que mudou (`GET /api/salas/{codigo}?desde=N`, com o token em `Authorization: Bearer`). Cada jogador tem o próprio histórico de passos, e o cursor é dele. A jogada leva o cursor visto: se a partida andou depois dele, volta `409`, em vez de cair num lugar que o jogador não viu.
+  - Descarte, como o usuário definiu: quem tem a carta da vez pode descartá-la até a primeira ação de quem vem depois do descarte (jogar, pedir aumento ou decidir a Onze). Essa ação fecha o descarte, e o servidor responde "não descartar" por todos antes de aplicá-la (RG-DESC-1 e RG-DESC-2). Não há prazo, e a sala não guarda resposta pendente, então quem não tem a carta não distingue "o dono não descartou" de "ninguém tinha" (RG-DESC-10, com teste). As opções de quem vem depois do descarte são as ações legais do estado em que todos recusaram; o motor puro permite calcular isso sem aplicar nada.
+  - Contra o bot continua igual, com o descarte como fase em que você responde, porque o bot agiria antes de você poder descartar.
+  - `Passo` saiu de `PartidaReconstituida` para servir aos dois modos. Os testes de informação oculta usam `CartasOcultas`, que vale para qualquer jogador; uma propriedade joga partidas inteiras numa sala, com escolhas aleatórias dos dois lados, e confere que nada vaza e que a seed não aparece.
