@@ -40,7 +40,7 @@ final class RespostaJson {
 
     static String partida(long seed, Reconstituida partida) {
         ConfiguracaoDaPartida configuracao = PartidaReconstituida.configuracao(seed);
-        Narrador narrador = new Narrador(VOCE, NOMES, configuracao, Notacao.SIMBOLOS);
+        Narrador narrador = new Narrador(VOCE, NOMES, configuracao, Notacao.BARALHO_ESPANHOL);
         Tela tela = new Tela(narrador, configuracao.variante());
 
         ObjectNode resposta = JSON.createObjectNode();

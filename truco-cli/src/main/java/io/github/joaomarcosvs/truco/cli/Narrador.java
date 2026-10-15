@@ -137,7 +137,7 @@ public final class Narrador {
     }
 
     String cartas(List<Carta> cartas) {
-        return cartas.stream().map(this::carta).collect(joining(" "));
+        return notacao.de(cartas);
     }
 
     static String pontos(int pontos) {

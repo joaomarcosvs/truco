@@ -27,7 +27,8 @@ import tools.jackson.databind.json.JsonMapper;
  * jogadas, e a partida é refeita ({@link PartidaReconstituida}).
  *
  * <ul>
- *   <li>{@code GET /}, {@code /mesa.js}, {@code /estilo.css}: a página.
+ *   <li>{@code GET /}, {@code /mesa.js}, {@code /cartas.js}, {@code /estilo.css}, {@code /baralho-espanhol.png}: a
+ *       página.
  *   <li>{@code POST /api/partida} com {@code {"seed": 2026, "acoes": [...]}}: a partida até agora ({@link RespostaJson}).
  *       Sem {@code seed}, começa uma partida com uma seed sorteada.
  *   <li>{@code GET /saude}: responde "ok", para o serviço de hospedagem saber que o servidor está de pé.
@@ -42,12 +43,18 @@ final class ServidorWeb {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    private record Arquivo(String recurso, String tipo) {}
+    /** Um arquivo da página; o cache vale para o que não muda entre versões, como a imagem do baralho. */
+    private record Arquivo(String recurso, String tipo, String cache) {}
+
+    private static final String SEM_CACHE = "no-store";
 
     private static final Map<String, Arquivo> PAGINA = Map.of(
-            "/", new Arquivo("/web/index.html", "text/html; charset=utf-8"),
-            "/mesa.js", new Arquivo("/web/mesa.js", "text/javascript; charset=utf-8"),
-            "/estilo.css", new Arquivo("/web/estilo.css", "text/css; charset=utf-8"));
+            "/", new Arquivo("/web/index.html", "text/html; charset=utf-8", SEM_CACHE),
+            "/mesa.js", new Arquivo("/web/mesa.js", "text/javascript; charset=utf-8", SEM_CACHE),
+            "/cartas.js", new Arquivo("/web/cartas.js", "text/javascript; charset=utf-8", SEM_CACHE),
+            "/estilo.css", new Arquivo("/web/estilo.css", "text/css; charset=utf-8", SEM_CACHE),
+            "/baralho-espanhol.png",
+                    new Arquivo("/web/baralho-espanhol.png", "image/png", "public, max-age=604800, immutable"));
 
     private final HttpServer servidor;
 
@@ -88,7 +95,7 @@ final class ServidorWeb {
             if (conteudo == null) {
                 throw new IllegalStateException("Arquivo da página ausente: " + arquivo.recurso());
             }
-            responder(troca, 200, arquivo.tipo(), conteudo.readAllBytes());
+            responder(troca, 200, arquivo.tipo(), arquivo.cache(), conteudo.readAllBytes());
         }
     }
 
@@ -183,12 +190,13 @@ final class ServidorWeb {
     }
 
     private static void responder(HttpExchange troca, int status, String tipo, String corpo) throws IOException {
-        responder(troca, status, tipo, corpo.getBytes(StandardCharsets.UTF_8));
+        responder(troca, status, tipo, SEM_CACHE, corpo.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static void responder(HttpExchange troca, int status, String tipo, byte[] corpo) throws IOException {
+    private static void responder(HttpExchange troca, int status, String tipo, String cache, byte[] corpo)
+            throws IOException {
         troca.getResponseHeaders().set("Content-Type", tipo);
-        troca.getResponseHeaders().set("Cache-Control", "no-store");
+        troca.getResponseHeaders().set("Cache-Control", cache);
         troca.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         troca.getResponseHeaders().set("Content-Security-Policy", "default-src 'self'");
         troca.sendResponseHeaders(status, corpo.length == 0 ? -1 : corpo.length);

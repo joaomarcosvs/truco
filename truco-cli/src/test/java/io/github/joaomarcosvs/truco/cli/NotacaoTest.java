@@ -1,6 +1,7 @@
 package io.github.joaomarcosvs.truco.cli;
 
 import static io.github.joaomarcosvs.truco.cli.Cartas.carta;
+import static io.github.joaomarcosvs.truco.cli.Cartas.cartas;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
@@ -17,6 +18,29 @@ class NotacaoTest {
     void notacoes(String simbolos, String letras) {
         assertThat(Notacao.SIMBOLOS.de(carta(simbolos))).isEqualTo(simbolos);
         assertThat(Notacao.LETRAS.de(carta(simbolos))).isEqualTo(letras);
+    }
+
+    @ParameterizedTest(name = "{0}: {1}")
+    @CsvSource({
+        "A♠, ás de espadas",
+        "4♣, 4 de bastos",
+        "7♦, 7 de ouros",
+        "10♥, sota de copas",
+        "Q♦, cavalo de ouros",
+        "J♣, rei de bastos"
+    })
+    @DisplayName("Baralho espanhol: paus viram bastos, e 10, Q e J viram sota, cavalo e rei, na mesma ordem de força")
+    void baralhoEspanhol(String simbolos, String nome) {
+        assertThat(Notacao.BARALHO_ESPANHOL.de(carta(simbolos))).isEqualTo(nome);
+    }
+
+    @Test
+    @DisplayName("Várias cartas: separadas por espaço, ou como numa frase no baralho espanhol")
+    void variasCartas() {
+        assertThat(Notacao.SIMBOLOS.de(cartas("2♣ 3♣ J♦"))).isEqualTo("2♣ 3♣ J♦");
+        assertThat(Notacao.BARALHO_ESPANHOL.de(cartas("2♣ 3♣ J♦")))
+                .isEqualTo("2 de bastos, 3 de bastos e rei de ouros");
+        assertThat(Notacao.BARALHO_ESPANHOL.de(cartas("4♦"))).isEqualTo("4 de ouros");
     }
 
     @Test

@@ -8,10 +8,12 @@ import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.carta.Naipe;
 import io.github.joaomarcosvs.truco.carta.Valor;
+import io.github.joaomarcosvs.truco.cli.Notacao;
 import io.github.joaomarcosvs.truco.partida.EstadoDaPartida;
 import io.github.joaomarcosvs.truco.partida.FaseDaRodada;
 import io.github.joaomarcosvs.truco.partida.Rodada;
 import io.github.joaomarcosvs.truco.partida.TipoDeRodada;
+import io.github.joaomarcosvs.truco.regras.paulista.TrucoPaulista;
 import io.github.joaomarcosvs.truco.web.PartidaReconstituida.Passo;
 import io.github.joaomarcosvs.truco.web.PartidaReconstituida.Reconstituida;
 import java.util.ArrayList;
@@ -39,8 +41,8 @@ class InformacaoOcultaNaWebTest {
     /** Uma carta no JSON do protocolo. */
     private static final Pattern CARTA_NO_JSON = Pattern.compile("\\{\"valor\":\"([A-Z]+)\",\"naipe\":\"([A-Z]+)\"}");
 
-    /** Uma carta num texto, como "10♠". */
-    private static final Pattern CARTA_NO_TEXTO = Pattern.compile("(10|[2-9AJQK])([♥♠♦♣])");
+    private static final List<Carta> BARALHO =
+            new TrucoPaulista().composicaoDoBaralho().cartas();
 
     @Property(tries = 60)
     @Label("RG-VIS-1 a RG-VIS-3: em partidas inteiras com escolhas aleatórias, a resposta da web nunca mostra uma carta"
@@ -112,15 +114,10 @@ class InformacaoOcultaNaWebTest {
         while (noJson.find()) {
             cartas.add(new Carta(Valor.valueOf(noJson.group(1)), Naipe.valueOf(noJson.group(2))));
         }
-        Matcher noTexto = CARTA_NO_TEXTO.matcher(json);
-        while (noTexto.find()) {
-            for (Valor valor : Valor.values()) {
-                for (Naipe naipe : Naipe.values()) {
-                    if (valor.simbolo().equals(noTexto.group(1))
-                            && naipe.simbolo().equals(noTexto.group(2))) {
-                        cartas.add(new Carta(valor, naipe));
-                    }
-                }
+        // Nos textos, pelo nome no baralho espanhol ("cavalo de ouros") ou pela notação com símbolo ("Q♦").
+        for (Carta carta : BARALHO) {
+            if (json.contains(Notacao.BARALHO_ESPANHOL.de(carta)) || json.contains(Notacao.SIMBOLOS.de(carta))) {
+                cartas.add(carta);
             }
         }
         return cartas;

@@ -3,6 +3,7 @@ package io.github.joaomarcosvs.truco.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -54,7 +55,14 @@ class ServidorWebTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource({"/, text/html", "/mesa.js, text/javascript", "/estilo.css, text/css", "/saude, text/plain"})
+    @CsvSource({
+        "/, text/html",
+        "/mesa.js, text/javascript",
+        "/cartas.js, text/javascript",
+        "/baralho-espanhol.png, image/png",
+        "/estilo.css, text/css",
+        "/saude, text/plain"
+    })
     @DisplayName("A página, o script, o estilo e a saúde do servidor")
     void pagina(String caminho, String tipo) throws Exception {
         HttpResponse<String> resposta = get(caminho);
@@ -62,6 +70,22 @@ class ServidorWebTest {
         assertThat(resposta.statusCode()).isEqualTo(200);
         assertThat(resposta.headers().firstValue("Content-Type"))
                 .hasValueSatisfying(valor -> assertThat(valor).startsWith(tipo));
+    }
+
+    @Test
+    @DisplayName("A imagem do baralho vai inteira e pode ficar em cache; a página, não")
+    void cacheDaImagem() throws Exception {
+        HttpResponse<byte[]> imagem = CLIENTE.send(
+                HttpRequest.newBuilder(endereco("/baralho-espanhol.png")).GET().build(),
+                HttpResponse.BodyHandlers.ofByteArray());
+        byte[] original;
+        try (InputStream recurso = ServidorWeb.class.getResourceAsStream("/web/baralho-espanhol.png")) {
+            original = recurso.readAllBytes();
+        }
+
+        assertThat(imagem.body()).isEqualTo(original);
+        assertThat(imagem.headers().firstValue("Cache-Control")).hasValue("public, max-age=604800, immutable");
+        assertThat(get("/").headers().firstValue("Cache-Control")).hasValue("no-store");
     }
 
     @Test
@@ -82,11 +106,11 @@ class ServidorWebTest {
         assertThat(json.get("seed").asLong()).isEqualTo(2026);
         JsonNode primeiro = json.get("passos").get(0);
         assertThat(primeiro.get("eventos").get(0).get("texto").asString())
-                .isEqualTo("Rodada 1: você dá as cartas, vira Q♦.");
+                .isEqualTo("Rodada 1: você dá as cartas, vira cavalo de ouros.");
         assertThat(primeiro.get("visao").get("jogador").asString()).isEqualTo("voce");
         JsonNode acoes = json.get("acoesLegais");
         assertThat(acoes.get(0).get("acao").toString()).isEqualTo("{\"tipo\":\"JogarCarta\",\"indiceNaMao\":0}");
-        assertThat(acoes.get(0).get("texto").asString()).isEqualTo("Jogar 2♣");
+        assertThat(acoes.get(0).get("texto").asString()).isEqualTo("Jogar 2 de bastos");
         assertThat(acoes.get(acoes.size() - 1).get("texto").asString()).isEqualTo("Pedir aumento para 3");
     }
 

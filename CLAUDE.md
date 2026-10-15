@@ -287,3 +287,5 @@ O que isso exige do desenho de hoje:
   - A página (HTML, CSS e JS, sem build) só desenha e manda jogadas, sem nenhuma regra. No descarte, quando a única opção é passar, o servidor passa sozinho, como a CLI.
   - A hospedagem gratuita é no Render, com o `Dockerfile` e o `render.yaml` da raiz.
   - Os testes cobrem a reconstituição, o servidor por HTTP (página, API, erros, partida inteira) e uma propriedade de que a resposta, inclusive os textos, nunca mostra uma carta oculta.
+  - A página mostra o baralho espanhol, só na aparência: paus vira bastos, e 10, Q e J viram sota, cavalo e rei, o que mantém a ordem de força. Os textos usam a `Notacao.BARALHO_ESPANHOL` ("cavalo de ouros").
+  - As cartas são a folha "Baraja española completa" do Wikimedia Commons, sob CC BY-SA 3.0, sem alterações e usada como sprite CSS. O crédito fica no rodapé da página, no `cartas.js` e em `docs/frontend-web.md`. A imagem vai com cache longo; a página e os scripts, com `no-store`.

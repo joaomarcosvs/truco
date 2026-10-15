@@ -5,51 +5,71 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Truco Paulista</title>
   <link rel="stylesheet" href="estilo.css">
+  <script src="cartas.js" defer></script>
   <script src="mesa.js" defer></script>
 </head>
 <body>
   <header class="topo">
-    <h1>Truco Paulista</h1>
-    <div class="placar" id="placar" aria-live="polite"></div>
-    <button class="botao" id="nova" type="button">Nova partida</button>
+    <div class="marca">
+      <span class="naipes" id="naipes" aria-hidden="true"></span>
+      <h1>Truco Paulista</h1>
+    </div>
+    <div class="placar" aria-live="polite" aria-label="Placar">
+      <div class="time voce"><span class="nome">Você</span><span class="pontos" id="pontos-voce">0</span></div>
+      <span class="meta">até 12</span>
+      <div class="time bot"><span class="pontos" id="pontos-bot">0</span><span class="nome">Bot</span></div>
+    </div>
+    <button class="botao discreto" id="nova" type="button">Nova partida</button>
   </header>
 
-  <main class="jogo">
+  <main class="salao">
     <section class="mesa" aria-label="Mesa">
-      <div class="lado">
-        <span class="rotulo">Bot</span>
-        <div class="mao" id="mao-bot"></div>
+      <div class="lado-bot">
+        <div class="jogador">
+          <span class="avatar bot" aria-hidden="true">B</span>
+          <div><strong>Bot</strong><span class="detalhe" id="cartas-bot"></span></div>
+        </div>
+        <div class="mao leque" id="mao-bot"></div>
       </div>
+
+      <div class="info" id="info"></div>
 
       <div class="centro">
-        <div class="info" id="info"></div>
-        <div class="tabuleiro">
-          <figure class="vira">
-            <figcaption class="rotulo">Vira</figcaption>
-            <div id="vira"></div>
-          </figure>
-          <div class="vazas" id="vazas"></div>
-        </div>
+        <figure class="vira">
+          <div id="vira"></div>
+          <figcaption>Vira</figcaption>
+        </figure>
+        <div class="vazas" id="vazas"></div>
       </div>
 
-      <div class="lado">
+      <div class="lado-voce">
         <div class="mao" id="mao-voce"></div>
-        <span class="rotulo">Você</span>
       </div>
 
-      <div class="acoes" id="acoes" aria-label="O que você faz"></div>
+      <div class="comandos">
+        <p class="dica" id="dica" aria-live="polite"></p>
+        <div class="acoes" id="acoes" aria-label="O que você faz"></div>
+      </div>
+
       <div class="aviso" id="aviso" role="status" hidden></div>
     </section>
 
-    <aside class="historico">
-      <h2>Histórico</h2>
-      <ol id="historico" aria-live="polite"></ol>
-    </aside>
+    <section class="console" aria-label="Histórico da partida">
+      <header class="console-topo">
+        <h2>Histórico</h2>
+        <span class="console-seed">Seed <strong id="seed">?</strong> · <a id="repetir" href="./">jogar esta partida de novo</a></span>
+      </header>
+      <ol class="console-linhas" id="historico"></ol>
+    </section>
   </main>
 
   <footer class="rodape">
-    Seed <span id="seed">?</span> · <a id="repetir" href="./">jogar esta partida de novo</a> ·
-    você contra um bot que joga ao acaso
+    <p>Você contra um bot que joga ao acaso · baralho espanhol: sota, cavalo e rei fazem as vezes de 10, Q e J</p>
+    <p class="creditos">
+      Cartas: <a href="https://commons.wikimedia.org/wiki/File:Baraja_espa%C3%B1ola_completa.png" rel="noopener">“Baraja española completa”</a>,
+      de Basquetteur, a partir do trabalho de Germarquezm, sob a licença
+      <a href="https://creativecommons.org/licenses/by-sa/3.0/deed.pt-br" rel="noopener">CC BY-SA 3.0</a>, via Wikimedia Commons (sem alterações).
+    </p>
   </footer>
 </body>
 </html>
