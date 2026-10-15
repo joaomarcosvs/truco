@@ -27,7 +27,7 @@ Tudo o que for feito agora serve para entregar um core **completo, correto, test
 - Servidor, rede, WebSocket
 - Cliente Unity e qualquer UI gráfica
 - Contas, matchmaking, persistência
-- 2x2 e as regras da seção 11 do documento de regras (apenas deixe o modelo preparado)
+- 2x2 e as regras da seção 11 do documento de regras (apenas deixe o modelo preparado). As decisões do 2x2 vão sendo registradas na seção 11 e na tabela da seção 12. Uma delas já afeta o core: pela RG-2X2-4, empatar com o parceiro empata a vaza, mas hoje `RegrasDeVazaPaulista.resultado` dá a vaza à equipe quando as mais fortes são da mesma equipe. No 1x1 isso não faz diferença; corrija no marco do 2x2, com teste.
 - Truco Mineiro e Gaudério (apenas respeite a seção 7)
 - Bots avançados
 
