@@ -674,6 +674,20 @@ function abrirRodadaNoConsole(titulo, resumo, vira) {
   estado.rodadaNoConsole = linhas;
 }
 
+const ESTILO_DA_LINHA = {
+  VazaFinalizada: 'divisor',
+  DescarteEncerrado: 'discreta',
+  AumentoPedido: 'aumento',
+  AumentoAceito: 'aumento',
+  JogadorCorreu: 'correu',
+  RodadaFinalizada: 'ponto',
+  RodadaAnulada: 'ponto',
+  PlacarAtualizado: 'placar',
+  PartidaFinalizada: 'fim',
+  RodadaDeOnzeIniciada: 'especial',
+  RodadaEscurinhoIniciada: 'especial',
+};
+
 function registrar({ evento, texto }) {
   if (evento.tipo === 'RodadaIniciada') {
     const vira = evento.vira ? ` · vira ${Baralho.nome(evento.vira)}` : '';
@@ -682,20 +696,41 @@ function registrar({ evento, texto }) {
   }
   if (!estado.rodadaNoConsole) abrirRodadaNoConsole('Partida', 'retomada de onde você parou');
   const id = quem(evento);
-  const classes = {
-    RodadaFinalizada: 'ponto', RodadaAnulada: 'ponto', PlacarAtualizado: 'placar', PartidaFinalizada: 'fim',
-  };
-  const linha = elemento('li', `linha ${lado(id)} ${classes[evento.tipo] ?? ''}`.trim());
-  linha.append(elemento('span', 'quem', lado(id) === 'geral' ? '' : nome(id)), elemento('span', 'texto', texto));
+  const estilo = ESTILO_DA_LINHA[evento.tipo] ?? '';
+  // A faixa da esquerda tem a cor de quem age; o resultado da vaza é uma divisória, sem cor.
+  const linha = elemento('li', `linha ${estilo === 'divisor' ? 'geral' : lado(id)} ${estilo}`.trim());
+  linha.append(textoComAtor(texto, id));
+  const cartas = evento.tipo === 'CartasDistribuidas' ? evento.cartas : evento.carta ? [evento.carta] : [];
+  const desenhos = evento.tipo === 'CartaEncobertaJogada'
+    ? [Baralho.verso('mini')]
+    : cartas.map((carta) => Baralho.carta(carta, 'mini'));
+  if (desenhos.length > 0) {
+    const miniaturas = elemento('span', 'cartas-da-linha');
+    miniaturas.setAttribute('aria-hidden', 'true'); // O texto já diz quais são.
+    miniaturas.append(...desenhos);
+    linha.append(miniaturas);
+  }
   estado.rodadaNoConsole.append(linha);
   const console = $('historico');
   console.scrollTop = console.scrollHeight;
 }
 
+/** O texto da linha, com o nome de quem age em destaque quando a frase começa por ele ("Adversário jogou…"). */
+function textoComAtor(texto, id) {
+  const el = elemento('span', 'texto');
+  const ator = id === undefined ? '' : `${comMaiuscula(nome(id))} `;
+  if (ator && texto.startsWith(ator)) {
+    el.append(elemento('strong', 'ator', ator.trim()), texto.slice(ator.length - 1));
+  } else {
+    el.textContent = texto;
+  }
+  return el;
+}
+
 function nota(texto) {
   if (!estado.rodadaNoConsole) abrirRodadaNoConsole('Partida', '');
   const linha = elemento('li', 'linha nota');
-  linha.append(elemento('span', 'quem', ''), elemento('span', 'texto', texto));
+  linha.append(elemento('span', 'texto', texto));
   estado.rodadaNoConsole.append(linha);
   const console = $('historico');
   console.scrollTop = console.scrollHeight;

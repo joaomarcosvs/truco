@@ -80,7 +80,7 @@ body {
   100% { transform: scale(1); }
 }
 
-#nova { justify-self: end; }
+#menu { justify-self: end; }
 
 /* ---------- Botões ---------- */
 
@@ -424,19 +424,47 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 .rodada-topo .resumo { color: var(--texto-suave); font-size: 0.82rem; }
 .rodada ol { list-style: none; margin: 0; padding: 0; }
 
+/* Cada linha: uma faixa com a cor de quem age, o texto e, se houver, as cartas em miniatura. */
 .linha {
-  display: grid;
-  grid-template-columns: 54px 1fr;
-  gap: 10px;
-  align-items: baseline;
-  padding: 3px 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 2px 0;
+  padding: 4px 10px;
+  border-left: 3px solid transparent;
+  border-radius: 0 8px 8px 0;
+  line-height: 1.35;
   animation: entrar 0.25s ease;
 }
-.linha .quem { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; text-align: right; color: var(--texto-suave); }
-.linha.voce .quem { color: var(--ouro); }
-.linha.adversario .quem { color: var(--azul); }
+.linha.voce { border-left-color: var(--ouro); background: linear-gradient(90deg, rgba(242, 193, 78, 0.1), transparent 70%); }
+.linha.adversario { border-left-color: var(--azul); background: linear-gradient(90deg, rgba(106, 163, 224, 0.1), transparent 70%); }
+.linha .ator { font-weight: 700; }
+.linha.voce .ator { color: var(--ouro); }
+.linha.adversario .ator { color: var(--azul); }
+
+.cartas-da-linha { display: inline-flex; gap: 3px; }
+.cartas-da-linha .carta.mini { width: 19px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)); }
+
+.linha.discreta .texto { font-size: 0.8rem; color: var(--texto-suave); }
+.linha.aumento .texto { font-weight: 600; }
+.linha.correu .texto { color: #ffb3a8; }
+.linha.especial .texto { font-weight: 700; color: var(--ouro); }
 .linha.ponto .texto { font-weight: 700; }
-.linha.placar .texto { color: var(--ouro); font-variant-numeric: tabular-nums; }
+
+/* O resultado da vaza separa as vazas. */
+.linha.divisor { justify-content: center; gap: 12px; padding: 6px 0; border: 0; font-size: 0.78rem; color: var(--texto-suave); }
+.linha.divisor::before, .linha.divisor::after { content: ""; flex: 1; border-top: 1px solid var(--linha); }
+
+.linha.placar { padding-top: 2px; padding-bottom: 6px; }
+.linha.placar .texto {
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ouro);
+  background: rgba(242, 193, 78, 0.12);
+  border: 1px solid rgba(242, 193, 78, 0.3);
+}
 .linha.fim .texto { font-family: var(--titulo); font-size: 1.05rem; font-weight: 700; color: var(--ouro); }
 .linha.nota .texto { font-style: italic; color: var(--texto-suave); }
 
