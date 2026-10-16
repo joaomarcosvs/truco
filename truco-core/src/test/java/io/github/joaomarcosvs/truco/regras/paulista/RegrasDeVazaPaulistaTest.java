@@ -26,6 +26,8 @@ class RegrasDeVazaPaulistaTest {
 
     private static final JogadorId ANA = new JogadorId("ana");
     private static final JogadorId BETO = new JogadorId("beto");
+    private static final JogadorId CARLA = new JogadorId("carla");
+    private static final JogadorId DAVI = new JogadorId("davi");
     private static final EquipeId EQUIPE_DA_ANA = new EquipeId("ana");
     private static final EquipeId EQUIPE_DO_BETO = new EquipeId("beto");
     /** Com vira 7♦, a manilha é o 10. */
@@ -139,8 +141,60 @@ class RegrasDeVazaPaulistaTest {
         }
     }
 
+    @Test
+    @DisplayName("RG-2X2-3: no 2x2, a carta mais forte vence a vaza para a dupla de quem a jogou")
+    void duplasMaisForteVenceParaADupla() {
+        assertThat(resultadoEmDuplas(
+                        Jogada.aberta(ANA, carta("2♥")),
+                        Jogada.aberta(BETO, carta("3♠")),
+                        Jogada.aberta(CARLA, carta("7♣")),
+                        Jogada.aberta(DAVI, carta("2♦"))))
+                .isEqualTo(new Vencida(BETO, EQUIPE_DO_BETO));
+    }
+
+    @Test
+    @DisplayName("RG-2X2-4: no 2x2, as mais fortes empatadas entre adversários empatam a vaza")
+    void duplasEmpateEntreAdversarios() {
+        assertThat(resultadoEmDuplas(
+                        Jogada.aberta(ANA, carta("3♥")),
+                        Jogada.aberta(BETO, carta("3♠")),
+                        Jogada.aberta(CARLA, carta("5♦")),
+                        Jogada.aberta(DAVI, carta("6♣"))))
+                .isEqualTo(new Empatada());
+    }
+
+    @Test
+    @DisplayName("RG-2X2-4: no 2x2, empatar com a carta do parceiro também empata a vaza")
+    void duplasEmpateComOParceiro() {
+        assertThat(resultadoEmDuplas(
+                        Jogada.aberta(ANA, carta("3♥")),
+                        Jogada.aberta(BETO, carta("2♠")),
+                        Jogada.aberta(CARLA, carta("3♣")),
+                        Jogada.aberta(DAVI, carta("7♠"))))
+                .isEqualTo(new Empatada());
+    }
+
+    @Test
+    @DisplayName("RG-2X2-3 e RG-ENC-2: no 2x2, só uma carta aberta e três encobertas: a dupla de quem a jogou vence")
+    void duplasUmaAbertaETresEncobertas() {
+        assertThat(resultadoEmDuplas(
+                        Jogada.encoberta(ANA, carta("3♥")),
+                        Jogada.aberta(BETO, carta("4♦")),
+                        Jogada.encoberta(CARLA, carta("3♣")),
+                        Jogada.encoberta(DAVI, carta("A♠"))))
+                .isEqualTo(new Vencida(BETO, EQUIPE_DO_BETO));
+    }
+
     private ResultadoDaVaza resultado(Jogada... jogadas) {
         return regras.resultado(List.of(jogadas), VIRA, jogador -> new EquipeId(jogador.valor()));
+    }
+
+    /** No 2x2, Ana joga com Carla, e Beto com Davi. */
+    private ResultadoDaVaza resultadoEmDuplas(Jogada... jogadas) {
+        return regras.resultado(
+                List.of(jogadas),
+                VIRA,
+                jogador -> jogador.equals(ANA) || jogador.equals(CARLA) ? EQUIPE_DA_ANA : EQUIPE_DO_BETO);
     }
 
     /** Uma vaza resumida pelo resultado; as cartas não importam para o desfecho. */

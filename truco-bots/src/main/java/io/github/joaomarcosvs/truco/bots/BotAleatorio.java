@@ -4,6 +4,7 @@ import io.github.joaomarcosvs.truco.acao.Acao;
 import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Random;
 
 /**
@@ -26,5 +27,13 @@ public final class BotAleatorio implements Estrategia {
             throw new IllegalArgumentException("Não há ação legal para escolher");
         }
         return legais.get(gerador.nextInt(legais.size()));
+    }
+
+    /** Faz uma das ações opcionais ou nenhuma, todas as possibilidades com a mesma chance. */
+    @Override
+    public Optional<Acao> decidirOpcional(VisaoDoJogador visao, List<Acao> legais) {
+        Objects.requireNonNull(visao, "visao");
+        int escolha = gerador.nextInt(legais.size() + 1);
+        return escolha < legais.size() ? Optional.of(legais.get(escolha)) : Optional.empty();
     }
 }

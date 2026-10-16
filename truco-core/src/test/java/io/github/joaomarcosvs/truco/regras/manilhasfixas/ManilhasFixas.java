@@ -28,6 +28,7 @@ import io.github.joaomarcosvs.truco.regras.EscadaDeApostas;
 import io.github.joaomarcosvs.truco.regras.OrdemDeForca;
 import io.github.joaomarcosvs.truco.regras.PontuacaoDaPartida;
 import io.github.joaomarcosvs.truco.regras.RegrasDeDescarte;
+import io.github.joaomarcosvs.truco.regras.RegrasDeDupla;
 import io.github.joaomarcosvs.truco.regras.RegrasDeVaza;
 import io.github.joaomarcosvs.truco.regras.RegrasEspeciais;
 import io.github.joaomarcosvs.truco.regras.VarianteDeRegras;
@@ -83,6 +84,11 @@ public record ManilhasFixas() implements VarianteDeRegras {
     @Override
     public RegrasEspeciais regrasEspeciais() {
         return PAULISTA.regrasEspeciais();
+    }
+
+    @Override
+    public RegrasDeDupla regrasDeDupla() {
+        return PAULISTA.regrasDeDupla();
     }
 
     @Override

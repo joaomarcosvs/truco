@@ -48,7 +48,8 @@ final class RegrasDeVazaPaulista implements RegrasDeVaza {
         if (abertas.isEmpty()) {
             return new Empatada(); // RG-ENC-4
         }
-        // RG-VAZA-2: vence a carta aberta mais forte; se as mais fortes são de equipes diferentes, a vaza empata.
+        // RG-VAZA-2: vence a carta aberta mais forte. RG-2X2-4: se as mais fortes empatam, a vaza empata, mesmo que
+        // sejam de parceiros.
         int maisForte = abertas.stream()
                 .mapToInt(jogada -> ordemDeForca.forca(jogada.carta(), vira))
                 .max()
@@ -56,11 +57,7 @@ final class RegrasDeVazaPaulista implements RegrasDeVaza {
         List<Jogada> maisFortes = abertas.stream()
                 .filter(jogada -> ordemDeForca.forca(jogada.carta(), vira) == maisForte)
                 .toList();
-        long equipes = maisFortes.stream()
-                .map(jogada -> equipeDe.apply(jogada.jogador()))
-                .distinct()
-                .count();
-        if (equipes > 1) {
+        if (maisFortes.size() > 1) {
             return new Empatada();
         }
         JogadorId vencedor = maisFortes.getFirst().jogador();

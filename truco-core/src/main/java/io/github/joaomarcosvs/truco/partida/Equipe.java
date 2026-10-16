@@ -3,7 +3,7 @@ package io.github.joaomarcosvs.truco.partida;
 import java.util.List;
 import java.util.Objects;
 
-/** Uma equipe e seus jogadores. Na v1 cada equipe tem um jogador, mas o modelo já aceita duplas (RG-ESC-1). */
+/** Uma equipe e seus jogadores: um no 1x1, dois (uma dupla) no 2x2 (RG-ESC-1). */
 public record Equipe(EquipeId id, List<JogadorId> jogadores) {
 
     public Equipe {

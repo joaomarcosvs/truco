@@ -25,14 +25,18 @@ final class CartasPresentes {
     }
 
     /**
-     * As cartas que o jogador não pode ver: as mãos dos outros, o baralho restante (RG-VIS-2), as cartas que os outros
-     * jogaram encobertas (RG-ENC-3) e, na Rodada Escurinho, a própria mão (RG-VIS-3).
+     * As cartas que o jogador não pode ver: as mãos dos outros (menos as dos parceiros nos momentos em que a dupla se
+     * vê), o baralho restante (RG-VIS-2), as cartas que os outros jogaram encobertas (RG-ENC-3, RG-2X2-15) e, na Rodada
+     * Escurinho, a própria mão (RG-VIS-3).
      */
-    static Set<Carta> ocultasPara(JogadorId jogador, Rodada rodada) {
+    static Set<Carta> ocultasPara(JogadorId jogador, EstadoDaPartida estado) {
+        Rodada rodada = estado.rodada();
         Set<Carta> ocultas = new HashSet<>(rodada.baralhoRestante());
         boolean escurinho = rodada.tipo() instanceof TipoDeRodada.Escurinho;
+        Set<JogadorId> parceirosVisiveis = parceirosVisiveis(jogador, estado);
         rodada.maos().forEach((dono, mao) -> {
-            if (!dono.equals(jogador) || escurinho) {
+            boolean propria = dono.equals(jogador);
+            if ((!propria && !parceirosVisiveis.contains(dono)) || escurinho) {
                 ocultas.addAll(mao);
             }
         });
@@ -40,6 +44,30 @@ final class CartasPresentes {
                 .filter(jogada -> jogada.encoberta() && !jogada.jogador().equals(jogador))
                 .forEach(jogada -> ocultas.add(jogada.carta()));
         return ocultas;
+    }
+
+    /**
+     * Os parceiros cuja mão o jogador pode ver agora, escrito de novo a partir das regras, para conferir o motor: quando
+     * a dupla dele responde a um aumento e todos quiseram ver as cartas (RG-2X2-10), e na decisão da Rodada de Onze, se
+     * a dupla é a que tem 11 (RG-2X2-11). No resto, e sempre no 1x1, nenhum (RG-2X2-15).
+     */
+    static Set<JogadorId> parceirosVisiveis(JogadorId jogador, EstadoDaPartida estado) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        List<JogadorId> parceiros = configuracao.parceirosDe(jogador);
+        EquipeId equipe = configuracao.equipeDe(jogador);
+        boolean seVeem = switch (estado.rodada().fase()) {
+            case FaseDaRodada.AguardandoRespostaDeAumento resposta -> {
+                List<JogadorId> querem =
+                        estado.rodada().aposta().pedidoPendente().orElseThrow().queremVerAsCartas();
+                yield configuracao.equipeDe(resposta.respondedor()).equals(equipe)
+                        && querem.contains(jogador)
+                        && querem.containsAll(parceiros);
+            }
+            case FaseDaRodada.DecisaoRodadaDeOnze decisao ->
+                configuracao.equipeDe(decisao.jogador()).equals(equipe);
+            default -> false;
+        };
+        return seVeem ? Set.copyOf(parceiros) : Set.of();
     }
 
     /**

@@ -11,6 +11,7 @@ import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
+import io.github.joaomarcosvs.truco.acao.VerCartasDoParceiro;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +55,10 @@ final class MesaDeTeste {
 
     MesaDeTeste correr(JogadorId jogador) {
         return agir(jogador, new Correr());
+    }
+
+    MesaDeTeste verCartas(JogadorId jogador) {
+        return agir(jogador, new VerCartasDoParceiro());
     }
 
     MesaDeTeste agir(JogadorId jogador, Acao acao) {

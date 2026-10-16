@@ -23,6 +23,9 @@ import java.util.Optional;
     @JsonSubTypes.Type(value = EventoDto.AumentoPedido.class, name = "AumentoPedido"),
     @JsonSubTypes.Type(value = EventoDto.AumentoAceito.class, name = "AumentoAceito"),
     @JsonSubTypes.Type(value = EventoDto.JogadorCorreu.class, name = "JogadorCorreu"),
+    @JsonSubTypes.Type(value = EventoDto.QuisVerAsCartas.class, name = "QuisVerAsCartas"),
+    @JsonSubTypes.Type(value = EventoDto.DuplaViuAsCartas.class, name = "DuplaViuAsCartas"),
+    @JsonSubTypes.Type(value = EventoDto.CartasDoParceiroVistas.class, name = "CartasDoParceiroVistas"),
     @JsonSubTypes.Type(value = EventoDto.RodadaFinalizada.class, name = "RodadaFinalizada"),
     @JsonSubTypes.Type(value = EventoDto.RodadaAnulada.class, name = "RodadaAnulada"),
     @JsonSubTypes.Type(value = EventoDto.PlacarAtualizado.class, name = "PlacarAtualizado"),
@@ -54,6 +57,12 @@ sealed interface EventoDto {
     record AumentoAceito(String jogador, int valor) implements EventoDto {}
 
     record JogadorCorreu(String jogador) implements EventoDto {}
+
+    record QuisVerAsCartas(String jogador) implements EventoDto {}
+
+    record DuplaViuAsCartas(String equipe) implements EventoDto {}
+
+    record CartasDoParceiroVistas(String jogador, String parceiro, List<CartaDto> cartas) implements EventoDto {}
 
     record RodadaFinalizada(int numeroDaRodada, String vencedora, int pontos) implements EventoDto {}
 

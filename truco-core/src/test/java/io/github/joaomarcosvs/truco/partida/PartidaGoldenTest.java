@@ -5,14 +5,17 @@ import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DO_BETO;
 import static io.github.joaomarcosvs.truco.partida.Partidas.MOTOR;
 import static io.github.joaomarcosvs.truco.partida.Partidas.aplicarAceita;
 import static io.github.joaomarcosvs.truco.partida.Partidas.configuracao;
+import static io.github.joaomarcosvs.truco.partida.Partidas.configuracaoEmDuplas;
 import static io.github.joaomarcosvs.truco.partida.Partidas.daVez;
 import static io.github.joaomarcosvs.truco.partida.Partidas.primeiraAcaoLegal;
 import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
+import io.github.joaomarcosvs.truco.acao.Aceitar;
 import io.github.joaomarcosvs.truco.acao.Correr;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
+import io.github.joaomarcosvs.truco.acao.VerCartasDoParceiro;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.AumentoAceito;
 import io.github.joaomarcosvs.truco.evento.AumentoPedido;
@@ -21,11 +24,14 @@ import io.github.joaomarcosvs.truco.evento.CartaEncobertaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaRecebidaPorDescarte;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
+import io.github.joaomarcosvs.truco.evento.CartasDoParceiroVistas;
 import io.github.joaomarcosvs.truco.evento.DescarteEncerrado;
+import io.github.joaomarcosvs.truco.evento.DuplaViuAsCartas;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.JogadorCorreu;
 import io.github.joaomarcosvs.truco.evento.PartidaFinalizada;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
+import io.github.joaomarcosvs.truco.evento.QuisVerAsCartas;
 import io.github.joaomarcosvs.truco.evento.RodadaAnulada;
 import io.github.joaomarcosvs.truco.evento.RodadaDeOnzeIniciada;
 import io.github.joaomarcosvs.truco.evento.RodadaEscurinhoIniciada;
@@ -213,6 +219,77 @@ class PartidaGoldenTest {
                         placar: ana 11 x 12 beto""");
     }
 
+    @Test
+    @DisplayName("RG-2X2-*: seed 2026 em duplas; o primeiro a poder pede truco, a dupla que recebe quer ver as cartas e"
+            + " aceita, e no resto cada um faz a primeira ação legal: eventos da 1ª rodada")
+    void duplas() {
+        EstadoDaPartida estado = MOTOR.novaPartida(configuracaoEmDuplas(2026));
+        List<String> linhas = new ArrayList<>(inicio(estado));
+        while (estado.numeroDaRodada() == 1) {
+            // Quem pode querer ver as cartas age antes de quem responde ao pedido.
+            EstadoDaPartida agora = estado;
+            JogadorId jogador = agora.configuracao().jogadoresNaOrdemDaMesa().stream()
+                    .filter(candidato -> MOTOR.acoesLegais(agora, candidato).contains(new VerCartasDoParceiro()))
+                    .findFirst()
+                    .orElseGet(() -> daVez(agora));
+            List<Acao> legais = MOTOR.acoesLegais(estado, jogador);
+            Acao escolhida;
+            if (legais.contains(new VerCartasDoParceiro())) {
+                escolhida = new VerCartasDoParceiro();
+            } else if (legais.contains(new Aceitar())) {
+                escolhida = new Aceitar();
+            } else if (legais.contains(new PedirAumento())
+                    && estado.rodada().aposta().valor() == 1) {
+                escolhida = new PedirAumento();
+            } else {
+                escolhida = legais.getFirst();
+            }
+            Aplicada aplicada = aplicarAceita(estado, jogador, escolhida);
+            aplicada.eventos().forEach(evento -> linhas.add(descrever(evento)));
+            estado = aplicada.novoEstado();
+        }
+
+        // Vira 6♣: a manilha é o 7. Ninguém tem o 4♦, então não há descarte. Davi abre e pede truco; recebe Ana, à
+        // direita dele, e a dupla dela se vê antes de aceitar. O 3♣ da Carla vence a 1ª vaza; as manilhas do Davi
+        // vencem a 2ª e a 3ª, e a dupla do Beto marca 3. O carteador passa para o Davi.
+        assertThat(String.join("\n", linhas)).isEqualTo("""
+                        rodada 1: carla dá as cartas, vale 1, vira 6♣
+                        davi recebe 5♥ 7♦ 7♥
+                        ana recebe 2♣ J♦ 2♠
+                        beto recebe 10♣ Q♦ 10♥
+                        carla recebe 3♣ Q♣ 10♦
+                        descarte encerrado
+                        davi pede 3
+                        ana quer ver as cartas
+                        carla quer ver as cartas
+                        equipe ana vê as cartas
+                        ana vê de carla: 3♣ Q♣ 10♦
+                        carla vê de ana: 2♣ J♦ 2♠
+                        ana aceita, a rodada vale 3
+                        davi joga 5♥
+                        ana joga 2♣
+                        beto joga 10♣
+                        carla joga 3♣
+                        vaza 1: carla vence
+                        carla joga Q♣
+                        davi joga 7♦
+                        ana joga J♦
+                        beto joga Q♦
+                        vaza 2: davi vence
+                        davi joga 7♥
+                        ana joga 2♠
+                        beto joga 10♥
+                        carla joga 10♦
+                        vaza 3: davi vence
+                        rodada 1: beto marca 3
+                        placar: ana 0 x 3 beto
+                        rodada 2: davi dá as cartas, vale 1, vira 7♥
+                        ana recebe 5♥ J♥ 10♣
+                        beto recebe 2♠ 3♣ 10♠
+                        carla recebe 2♦ A♠ 5♠
+                        davi recebe 7♠ 6♦ 2♥""");
+    }
+
     /** A 1ª rodada, que já vem distribuída no estado inicial, descrita como os eventos das rodadas seguintes. */
     private static List<String> inicio(EstadoDaPartida estado) {
         Rodada rodada = estado.rodada();
@@ -265,6 +342,14 @@ class PartidaGoldenTest {
             case AumentoPedido pedido -> "%s pede %d".formatted(pedido.pedinte(), pedido.nivelProposto());
             case AumentoAceito aceito -> "%s aceita, a rodada vale %d".formatted(aceito.jogador(), aceito.valor());
             case JogadorCorreu correu -> "%s corre".formatted(correu.jogador());
+            case QuisVerAsCartas quis -> "%s quer ver as cartas".formatted(quis.jogador());
+            case DuplaViuAsCartas viu -> "equipe %s vê as cartas".formatted(viu.equipe());
+            case CartasDoParceiroVistas vistas ->
+                "%s vê de %s: %s"
+                        .formatted(
+                                vistas.jogador(),
+                                vistas.parceiro(),
+                                vistas.cartas().stream().map(Carta::toString).collect(joining(" ")));
             case PlacarAtualizado placar ->
                 "placar: ana %d x %d beto"
                         .formatted(

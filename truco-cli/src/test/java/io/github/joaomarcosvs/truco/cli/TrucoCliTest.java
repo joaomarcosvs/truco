@@ -79,6 +79,23 @@ class TrucoCliTest {
     }
 
     @Test
+    @DisplayName("RG-FIM-1 e RG-2X2-*: com --2x2, você e Carla jogam contra Beto e Davi; escolhendo sempre a opção 1, a"
+            + " partida vai até o fim, e as cartas dos outros só aparecem quando a dupla se vê")
+    void partidaInteiraEmDuplas() {
+        Execucao execucao = executar(SEMPRE_A_PRIMEIRA, "--2x2", "--seed", "2026");
+
+        assertThat(execucao.codigo()).isZero();
+        assertThat(execucao.linhas().getFirst())
+                .isEqualTo("Truco Paulista: você e Carla contra Beto e Davi. Seed 2026 (use --2x2 --seed 2026 para"
+                        + " repetir esta partida).");
+        assertThat(execucao.linhas()).anyMatch(linha -> linha.startsWith("Fim de partida: "));
+        assertThat(execucao.saida()).doesNotContain("Opção inválida");
+        assertThat(execucao.linhas())
+                .noneMatch(linha -> linha.matches("(Beto|Carla|Davi) (recebeu|comprou) .*")
+                        || linha.matches("Você viu as cartas de (Beto|Davi).*"));
+    }
+
+    @Test
     @DisplayName("RG-VIS-2: a CLI só narra os eventos que você pode ver: as cartas que o bot recebe nunca aparecem")
     void soOsSeusEventos() {
         Execucao execucao = executar(SEMPRE_A_PRIMEIRA, "--seed", "2026");

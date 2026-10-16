@@ -72,11 +72,12 @@ class DocumentacaoDoProtocoloTest {
     }
 
     @Test
-    @DisplayName("O exemplo de visão é válido, volta igual e tem os campos da VisaoDoJogador, na mesma ordem")
+    @DisplayName("Os exemplos de visão, no 1x1 e no 2x2, são válidos, voltam iguais e têm os campos da VisaoDoJogador,"
+            + " na mesma ordem")
     void visao() throws IOException {
         List<Exemplo> exemplos = exemplos("visao");
 
-        assertThat(exemplos).hasSize(1);
+        assertThat(exemplos).hasSize(2);
         conferir(exemplos, ProtocoloJson::lerVisao, ProtocoloJson::escrever);
     }
 

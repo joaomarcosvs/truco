@@ -5,4 +5,11 @@ package io.github.joaomarcosvs.truco.acao;
  * jogada, as que estavam depois dela sobem uma posição.
  */
 public sealed interface Acao
-        permits JogarCarta, JogarEncoberta, Descartar, RecusarDescarte, PedirAumento, Aceitar, Correr {}
+        permits JogarCarta,
+                JogarEncoberta,
+                Descartar,
+                RecusarDescarte,
+                PedirAumento,
+                Aceitar,
+                Correr,
+                VerCartasDoParceiro {}

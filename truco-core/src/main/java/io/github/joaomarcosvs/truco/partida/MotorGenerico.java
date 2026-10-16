@@ -11,6 +11,7 @@ import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
+import io.github.joaomarcosvs.truco.acao.VerCartasDoParceiro;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.AumentoAceito;
 import io.github.joaomarcosvs.truco.evento.AumentoPedido;
@@ -19,11 +20,14 @@ import io.github.joaomarcosvs.truco.evento.CartaEncobertaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaRecebidaPorDescarte;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
+import io.github.joaomarcosvs.truco.evento.CartasDoParceiroVistas;
 import io.github.joaomarcosvs.truco.evento.DescarteEncerrado;
+import io.github.joaomarcosvs.truco.evento.DuplaViuAsCartas;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.JogadorCorreu;
 import io.github.joaomarcosvs.truco.evento.PartidaFinalizada;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
+import io.github.joaomarcosvs.truco.evento.QuisVerAsCartas;
 import io.github.joaomarcosvs.truco.evento.RodadaAnulada;
 import io.github.joaomarcosvs.truco.evento.RodadaDeOnzeIniciada;
 import io.github.joaomarcosvs.truco.evento.RodadaEscurinhoIniciada;
@@ -59,7 +63,7 @@ final class MotorGenerico implements MotorDeTruco {
 
     @Override
     public EstadoDaPartida novaPartida(ConfiguracaoDaPartida configuracao) {
-        exigirUmContraUm(configuracao);
+        exigirFormatoAceito(configuracao);
         List<JogadorId> mesa = configuracao.jogadoresNaOrdemDaMesa();
         // RG-PARTIDA-4: o carteador da 1ª rodada é sorteado pela seed.
         JogadorId carteador = mesa.get(Sorteio.carteadorInicial(configuracao.seed(), mesa.size()));
@@ -121,6 +125,14 @@ final class MotorGenerico implements MotorDeTruco {
                 if (escada.podeAumentar(aceita(rodada.aposta(), equipe), equipe)) {
                     acoes.add(new PedirAumento());
                 }
+                if (podeQuererVerAsCartas(estado, jogador)) {
+                    acoes.add(new VerCartasDoParceiro());
+                }
+            }
+            case AguardandoRespostaDeAumento resposta
+            when podeQuererVerAsCartas(estado, jogador) -> {
+                // RG-2X2-8 e RG-2X2-9: o parceiro de quem responde não responde, mas pode querer ver as cartas.
+                acoes.add(new VerCartasDoParceiro());
             }
             case AguardandoDescarte jaRespondeu -> {}
             case DecisaoRodadaDeOnze outroJogador -> {}
@@ -154,7 +166,11 @@ final class MotorGenerico implements MotorDeTruco {
             case PedirAumento pedido -> pedirAumento(estado, jogador, eventos);
             case Aceitar aceite -> aceitar(estado, jogador, eventos);
             case Correr corrida -> correr(estado, jogador, eventos);
+            case VerCartasDoParceiro ver -> quererVerAsCartas(estado, jogador, eventos);
         };
+        if (comecouADecisaoDaRodadaDeOnze(estado, novoEstado)) {
+            mostrarAsCartasDosParceirosNaRodadaDeOnze(novoEstado, eventos);
+        }
         return new Aplicada(novoEstado, eventos);
     }
 
@@ -194,6 +210,7 @@ final class MotorGenerico implements MotorDeTruco {
                 rodada.descarte().descartadas(),
                 cartaDaVezNoDescarte,
                 maoVisivel ? rodada.maoDe(jogador) : List.of(),
+                maosDosParceirosVisiveis(estado, jogador),
                 cartasNaMao,
                 rodada.vazas().stream()
                         .map(vaza -> new VazaVisivel(visiveis(vaza.jogadas(), jogador), vaza.resultado()))
@@ -201,6 +218,33 @@ final class MotorGenerico implements MotorDeTruco {
                 visiveis(rodada.vazaAtual(), jogador),
                 vezDe,
                 vencedora);
+    }
+
+    /**
+     * As mãos dos parceiros que o jogador vê agora (RG-2X2-15): respondendo a um aumento, depois que toda a dupla quis
+     * se ver (RG-2X2-10), e na decisão da Rodada de Onze, se a equipe dele é a que tem 11 (RG-2X2-11).
+     */
+    private static Map<JogadorId, List<Carta>> maosDosParceirosVisiveis(EstadoDaPartida estado, JogadorId jogador) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        Rodada rodada = estado.rodada();
+        EquipeId equipe = configuracao.equipeDe(jogador);
+        boolean seVeem = switch (rodada.fase()) {
+            case AguardandoRespostaDeAumento resposta ->
+                configuracao.equipeDe(resposta.respondedor()).equals(equipe)
+                        && rodada.aposta()
+                                .pedidoPendente()
+                                .map(pedido -> duplaSeVe(configuracao, pedido))
+                                .orElse(false);
+            case DecisaoRodadaDeOnze decisao ->
+                configuracao.variante().regrasDeDupla().parceirosSeVeemNaRodadaDeOnze()
+                        && configuracao.equipeDe(decisao.jogador()).equals(equipe);
+            default -> false;
+        };
+        Map<JogadorId, List<Carta>> maos = new LinkedHashMap<>();
+        if (seVeem) {
+            configuracao.parceirosDe(jogador).forEach(parceiro -> maos.put(parceiro, rodada.maoDe(parceiro)));
+        }
+        return maos;
     }
 
     /** As jogadas como o observador as vê: a carta encoberta só aparece para quem a jogou (RG-ENC-3). */
@@ -353,6 +397,82 @@ final class MotorGenerico implements MotorDeTruco {
     }
 
     /**
+     * O jogador quer ver as cartas dos parceiros para responder ao pedido (RG-2X2-9). Quando todos da dupla querem, eles
+     * se veem até a resposta, e os adversários sabem que eles olharam, mas não as cartas (RG-2X2-10).
+     */
+    private static EstadoDaPartida quererVerAsCartas(EstadoDaPartida estado, JogadorId jogador, List<Evento> eventos) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        Aposta aposta = estado.rodada().aposta();
+        PedidoDeAumento pedido = aposta.pedidoPendente().orElseThrow();
+        PedidoDeAumento atualizado = new PedidoDeAumento(
+                pedido.pedinte(),
+                pedido.respondedor(),
+                pedido.nivelProposto(),
+                comAcrescimo(pedido.queremVerAsCartas(), jogador));
+        eventos.add(new QuisVerAsCartas(jogador));
+        if (duplaSeVe(configuracao, atualizado)) {
+            EquipeId equipe = configuracao.equipeDe(jogador);
+            eventos.add(new DuplaViuAsCartas(equipe));
+            mostrarAsCartasDosParceiros(estado, equipe, eventos);
+        }
+        Aposta comVontade = new Aposta(aposta.valor(), aposta.ultimaEquipeQueAceitou(), Optional.of(atualizado));
+        return comRodada(estado, estado.rodada().comAposta(comVontade));
+    }
+
+    /**
+     * Com um pedido de aumento pendente, cada jogador da dupla que responde pode querer ver as cartas dos parceiros, uma
+     * vez, se a variante permite (RG-2X2-9). No 1x1 não há parceiros, e a ação nunca aparece.
+     */
+    private static boolean podeQuererVerAsCartas(EstadoDaPartida estado, JogadorId jogador) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        Optional<PedidoDeAumento> pendente = estado.rodada().aposta().pedidoPendente();
+        return configuracao.variante().regrasDeDupla().podeVerCartasAoReceberAumento()
+                && pendente.isPresent()
+                && !configuracao.parceirosDe(jogador).isEmpty()
+                && configuracao
+                        .equipeDe(jogador)
+                        .equals(configuracao.equipeDe(pendente.get().respondedor()))
+                && !pendente.get().queremVerAsCartas().contains(jogador);
+    }
+
+    /** Se todos da equipe que responde ao pedido já quiseram ver as cartas, e por isso eles se veem (RG-2X2-10). */
+    private static boolean duplaSeVe(ConfiguracaoDaPartida configuracao, PedidoDeAumento pedido) {
+        EquipeId equipe = configuracao.equipeDe(pedido.respondedor());
+        return configuracao.jogadoresNaOrdemDaMesa().stream()
+                .filter(jogador -> configuracao.equipeDe(jogador).equals(equipe))
+                .allMatch(pedido.queremVerAsCartas()::contains);
+    }
+
+    /** Cada jogador da equipe recebe, em particular, as cartas dos parceiros (RG-2X2-10, RG-2X2-11, RG-2X2-15). */
+    private static void mostrarAsCartasDosParceiros(EstadoDaPartida estado, EquipeId equipe, List<Evento> eventos) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        for (JogadorId jogador : configuracao.jogadoresNaOrdemDaMesa()) {
+            if (configuracao.equipeDe(jogador).equals(equipe)) {
+                for (JogadorId parceiro : configuracao.parceirosDe(jogador)) {
+                    eventos.add(new CartasDoParceiroVistas(
+                            jogador, parceiro, estado.rodada().maoDe(parceiro)));
+                }
+            }
+        }
+    }
+
+    /** Se a ação levou à decisão da Rodada de Onze, que não estava em andamento antes dela. */
+    private static boolean comecouADecisaoDaRodadaDeOnze(EstadoDaPartida antes, EstadoDaPartida depois) {
+        boolean decidiaAntes = antes.rodada().fase() instanceof DecisaoRodadaDeOnze
+                && antes.numeroDaRodada() == depois.numeroDaRodada();
+        return depois.rodada().fase() instanceof DecisaoRodadaDeOnze && !decidiaAntes;
+    }
+
+    /** RG-2X2-11: na decisão da Rodada de Onze, os parceiros da equipe com 11 veem as cartas uns dos outros. */
+    private static void mostrarAsCartasDosParceirosNaRodadaDeOnze(EstadoDaPartida estado, List<Evento> eventos) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        if (configuracao.variante().regrasDeDupla().parceirosSeVeemNaRodadaDeOnze()
+                && estado.rodada().fase() instanceof DecisaoRodadaDeOnze(JogadorId decide)) {
+            mostrarAsCartasDosParceiros(estado, configuracao.equipeDe(decide), eventos);
+        }
+    }
+
+    /**
      * A aposta depois de aceito o pedido pendente: a rodada vale o nível pedido, e fica registrado quem aceitou, que é
      * quem a escada consulta para saber quem pode aumentar (RG-AUM-3, RG-AUM-5).
      */
@@ -478,7 +598,8 @@ final class MotorGenerico implements MotorDeTruco {
             return new AguardandoDescarte(cartaDaVez.get()); // RG-DESC-2 e RG-ONZE-3
         }
         if (rodada.tipo() instanceof DeOnze onze && !onze.decidiuJogar()) {
-            return new DecisaoRodadaDeOnze(jogadorDa(configuracao, onze.equipeComOnze())); // RG-ONZE-1
+            // RG-ONZE-1 e RG-2X2-12
+            return new DecisaoRodadaDeOnze(quemDecideARodadaDeOnze(configuracao, carteador, onze.equipeComOnze()));
         }
         Optional<PedidoDeAumento> pendente = rodada.aposta().pedidoPendente();
         if (pendente.isPresent()) {
@@ -508,14 +629,13 @@ final class MotorGenerico implements MotorDeTruco {
                 .findFirst();
     }
 
-    /** O jogador que decide pela equipe; na v1, cada equipe tem um jogador só. */
-    private static JogadorId jogadorDa(ConfiguracaoDaPartida configuracao, EquipeId equipe) {
-        return configuracao.equipes().stream()
-                .filter(candidata -> candidata.id().equals(equipe))
+    /** Decide a Rodada de Onze o jogador da equipe com 11 que joga primeiro na 1ª vaza (RG-ONZE-1, RG-2X2-12). */
+    private static JogadorId quemDecideARodadaDeOnze(
+            ConfiguracaoDaPartida configuracao, JogadorId carteador, EquipeId equipe) {
+        return configuracao.jogadoresAPartirDe(configuracao.aDireitaDe(carteador)).stream()
+                .filter(jogador -> configuracao.equipeDe(jogador).equals(equipe))
                 .findFirst()
-                .orElseThrow()
-                .jogadores()
-                .getFirst();
+                .orElseThrow();
     }
 
     /** A outra equipe: o truco tem sempre duas. */
@@ -542,13 +662,13 @@ final class MotorGenerico implements MotorDeTruco {
         return configuracao.variante().regrasDeDescarte().sequencia(rodada.vira());
     }
 
-    private static void exigirUmContraUm(ConfiguracaoDaPartida configuracao) {
-        // RG-ESC-1: a v1 é 1x1; as regras de duplas (seção 11 das regras) ainda não existem.
-        boolean umContraUm = configuracao.equipes().size() == 2
-                && configuracao.equipes().stream()
-                        .allMatch(equipe -> equipe.jogadores().size() == 1);
-        if (!umContraUm) {
-            throw new IllegalArgumentException("A v1 só aceita partidas 1x1 (RG-ESC-1)");
+    private static void exigirFormatoAceito(ConfiguracaoDaPartida configuracao) {
+        // RG-ESC-1: duas equipes, do tamanho que a variante aceita (no Truco Paulista, 1x1 ou 2x2).
+        int equipes = configuracao.equipes().size();
+        int porEquipe = configuracao.equipes().getFirst().jogadores().size();
+        if (equipes != 2 || !configuracao.variante().regrasDeDupla().aceitaJogadoresPorEquipe(porEquipe)) {
+            throw new IllegalArgumentException(
+                    "A variante não aceita %d equipes de %d jogador(es) (RG-ESC-1)".formatted(equipes, porEquipe));
         }
     }
 

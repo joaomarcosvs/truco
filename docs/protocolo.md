@@ -20,11 +20,12 @@ O estado completo da partida nunca vira JSON, porque tem informação oculta. O 
 
 ## Valores básicos
 
-- **Jogador e equipe:** o identificador, como texto: `"ana"`. Na v1, cada equipe tem um jogador só, e a equipe tem o mesmo identificador dele.
+- **Jogador e equipe:** o identificador, como texto: `"ana"`. No 1x1, cada equipe tem um jogador só, e em geral o mesmo identificador dele; no 2x2, a dupla tem um identificador próprio, como `"ana-carla"`.
 - **Carta:** `{"valor":"AS","naipe":"COPAS"}`, só em ASCII.
   - Valores usados no Truco Paulista: `AS`, `DOIS`, `TRES`, `QUATRO`, `CINCO`, `SEIS`, `SETE`, `DEZ`, `DAMA`, `VALETE`. O baralho de 40 cartas não tem `OITO`, `NOVE` nem `REI`.
   - Naipes: `COPAS`, `ESPADAS`, `OUROS`, `PAUS`.
 - **Placar** e **cartas na mão:** objetos com o identificador como chave: `{"ana":3,"beto":1}`.
+- **Mãos dos parceiros** (2x2): objeto com o identificador do parceiro como chave e a mão dele como valor: `{"davi":[{"valor":"SETE","naipe":"ESPADAS"}]}`. Vazio, `{}`, quando a dupla não está se vendo.
 - **Tipo da rodada:** `{"tipo":"Normal"}`, `{"tipo":"DeOnze","equipeComOnze":"ana","decidiuJogar":false}` ou `{"tipo":"Escurinho"}`.
 - **Resultado de uma vaza:** `{"tipo":"Vencida","jogador":"ana","equipe":"ana"}` ou `{"tipo":"Empatada"}`.
 
@@ -72,6 +73,12 @@ Correr de um aumento ou, na Rodada de Onze, decidir não jogar. Na própria vez 
 
 ```json acao
 {"tipo":"Correr"}
+```
+
+No 2x2, querer ver as cartas do parceiro (e mostrar as suas) antes de responder a um aumento. Vale para quem recebeu o pedido e para o parceiro dele; quando os dois querem, eles se veem até a resposta:
+
+```json acao
+{"tipo":"VerCartasDoParceiro"}
 ```
 
 ## Eventos (servidor → cliente)
@@ -148,6 +155,24 @@ Um jogador correu:
 {"tipo":"JogadorCorreu","jogador":"beto"}
 ```
 
+No 2x2, um jogador da dupla que recebeu o pedido quer ver as cartas do parceiro. É público, como seria falado na mesa:
+
+```json evento
+{"tipo":"QuisVerAsCartas","jogador":"davi"}
+```
+
+Os dois da dupla quiseram, e eles se viram. Os adversários sabem que eles olharam, mas não as cartas:
+
+```json evento
+{"tipo":"DuplaViuAsCartas","equipe":"beto-davi"}
+```
+
+As cartas que o jogador viu na mão do parceiro (**privado**): ao responder a um aumento, depois que a dupla quis se ver, e na decisão da Rodada de Onze da dupla com 11:
+
+```json evento
+{"tipo":"CartasDoParceiroVistas","jogador":"beto","parceiro":"davi","cartas":[{"valor":"SETE","naipe":"ESPADAS"},{"valor":"CINCO","naipe":"COPAS"},{"valor":"SEIS","naipe":"PAUS"}]}
+```
+
 Uma rodada terminou e a equipe marcou os pontos:
 
 ```json evento
@@ -194,10 +219,11 @@ O que um jogador pode ver da partida. O cliente pode desenhar a mesa só com ela
 | `jogadoresNaOrdemDaMesa`, `equipes` | a mesa; o próximo a jogar é o que está à direita (o seguinte na lista) |
 | `placar`, `numeroDaRodada`, `carteador` | |
 | `tipoDaRodada` | normal, de Onze ou Escurinho |
-| `aposta` | quanto a rodada vale (`valor`), a equipe que aceitou o último aumento (a única que pode pedir o próximo) e o pedido pendente, se houver |
+| `aposta` | quanto a rodada vale (`valor`), a equipe que aceitou o último aumento (a única que pode pedir o próximo) e o pedido pendente, se houver; no 2x2, o pedido diz também quem da dupla que responde já quis ver as cartas (`queremVerAsCartas`) |
 | `vira`, `descartadas` | cartas públicas |
 | `cartaDaVezNoDescarte` | durante o descarte, a carta da vez; nunca diz quem a tem |
 | `mao` | as suas cartas, na ordem das posições; vazia na Rodada Escurinho |
+| `maosDosParceiros` | no 2x2, as mãos dos parceiros que você vê agora: só enquanto a dupla responde a um aumento depois de os dois quererem se ver, e na decisão da Rodada de Onze; vazio no resto |
 | `cartasNaMao` | quantas cartas cada jogador tem |
 | `vazas`, `vazaAtual` | as jogadas; a carta encoberta de outro jogador vem com `"carta":null` |
 | `vezDe` | de quem se espera a ação; `null` no descarte (todos respondem) e no fim da partida |
@@ -220,12 +246,13 @@ Exemplo: a visão de Ana na 3ª rodada. Beto venceu a 1ª vaza e abriu a 2ª com
   "aposta": {
     "valor": 3,
     "ultimaEquipeQueAceitou": "ana",
-    "pedidoPendente": {"pedinte": "ana", "respondedor": "beto", "nivelProposto": 6}
+    "pedidoPendente": {"pedinte": "ana", "respondedor": "beto", "nivelProposto": 6, "queremVerAsCartas": []}
   },
   "vira": {"valor": "SETE", "naipe": "OUROS"},
   "descartadas": [{"valor": "QUATRO", "naipe": "OUROS"}],
   "cartaDaVezNoDescarte": null,
   "mao": [{"valor": "AS", "naipe": "ESPADAS"}, {"valor": "DEZ", "naipe": "PAUS"}],
+  "maosDosParceiros": {},
   "cartasNaMao": {"ana": 2, "beto": 1},
   "vazas": [
     {
@@ -237,6 +264,40 @@ Exemplo: a visão de Ana na 3ª rodada. Beto venceu a 1ª vaza e abriu a 2ª com
     }
   ],
   "vazaAtual": [{"jogador": "beto", "carta": null, "encoberta": true}],
+  "vezDe": "beto",
+  "vencedoraDaPartida": null
+}
+```
+
+Exemplo no 2x2: Ana e Carla contra Beto e Davi, sentados nessa ordem. Davi deu as cartas, Ana abriu pedindo truco, e o pedido foi para o Beto. Davi e Beto quiseram ver as cartas, então Beto vê a mão do Davi até responder:
+
+```json visao
+{
+  "jogador": "beto",
+  "jogadoresNaOrdemDaMesa": ["ana", "beto", "carla", "davi"],
+  "equipes": [
+    {"id": "ana-carla", "jogadores": ["ana", "carla"]},
+    {"id": "beto-davi", "jogadores": ["beto", "davi"]}
+  ],
+  "placar": {"ana-carla": 0, "beto-davi": 0},
+  "numeroDaRodada": 1,
+  "carteador": "davi",
+  "tipoDaRodada": {"tipo": "Normal"},
+  "aposta": {
+    "valor": 1,
+    "ultimaEquipeQueAceitou": null,
+    "pedidoPendente": {"pedinte": "ana", "respondedor": "beto", "nivelProposto": 3, "queremVerAsCartas": ["davi", "beto"]}
+  },
+  "vira": {"valor": "SETE", "naipe": "OUROS"},
+  "descartadas": [],
+  "cartaDaVezNoDescarte": null,
+  "mao": [{"valor": "DOIS", "naipe": "ESPADAS"}, {"valor": "QUATRO", "naipe": "COPAS"}, {"valor": "CINCO", "naipe": "OUROS"}],
+  "maosDosParceiros": {
+    "davi": [{"valor": "SETE", "naipe": "ESPADAS"}, {"valor": "CINCO", "naipe": "COPAS"}, {"valor": "SEIS", "naipe": "PAUS"}]
+  },
+  "cartasNaMao": {"ana": 3, "beto": 3, "carla": 3, "davi": 3},
+  "vazas": [],
+  "vazaAtual": [],
   "vezDe": "beto",
   "vencedoraDaPartida": null
 }

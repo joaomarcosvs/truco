@@ -48,7 +48,7 @@ class InformacaoOcultaTest {
         for (JogadorId jogador : List.of(ANA, BETO)) {
             VisaoDoJogador visao = MOTOR.visaoDe(estado, jogador);
 
-            assertThat(ocultasPara(jogador, estado.rodada())).hasSize(3 + 33).noneMatch(carta -> mostra(visao, carta));
+            assertThat(ocultasPara(jogador, estado)).hasSize(3 + 33).noneMatch(carta -> mostra(visao, carta));
         }
     }
 

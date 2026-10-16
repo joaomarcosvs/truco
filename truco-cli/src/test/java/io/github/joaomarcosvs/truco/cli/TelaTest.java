@@ -3,11 +3,18 @@ package io.github.joaomarcosvs.truco.cli;
 import static io.github.joaomarcosvs.truco.cli.Cartas.carta;
 import static io.github.joaomarcosvs.truco.cli.Cartas.cartas;
 import static io.github.joaomarcosvs.truco.cli.NarradorTest.CONFIGURACAO;
+import static io.github.joaomarcosvs.truco.cli.NarradorTest.DUPLAS;
+import static io.github.joaomarcosvs.truco.cli.NarradorTest.DUPLA_ADVERSARIA;
 import static io.github.joaomarcosvs.truco.cli.NarradorTest.EQUIPE_DO_BOT;
+import static io.github.joaomarcosvs.truco.cli.NarradorTest.SUA_DUPLA;
 import static io.github.joaomarcosvs.truco.cli.NarradorTest.SUA_EQUIPE;
 import static io.github.joaomarcosvs.truco.cli.NarradorTest.narrador;
+import static io.github.joaomarcosvs.truco.cli.NarradorTest.narradorEmDuplas;
 import static io.github.joaomarcosvs.truco.cli.NarradorTest.placar;
+import static io.github.joaomarcosvs.truco.cli.TrucoCli.BETO;
 import static io.github.joaomarcosvs.truco.cli.TrucoCli.BOT;
+import static io.github.joaomarcosvs.truco.cli.TrucoCli.CARLA;
+import static io.github.joaomarcosvs.truco.cli.TrucoCli.DAVI;
 import static io.github.joaomarcosvs.truco.cli.TrucoCli.VOCE;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,9 +25,11 @@ import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
+import io.github.joaomarcosvs.truco.acao.VerCartasDoParceiro;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.partida.Aposta;
 import io.github.joaomarcosvs.truco.partida.PedidoDeAumento;
+import io.github.joaomarcosvs.truco.partida.Placar;
 import io.github.joaomarcosvs.truco.partida.ResultadoDaVaza;
 import io.github.joaomarcosvs.truco.partida.TipoDeRodada;
 import io.github.joaomarcosvs.truco.visao.JogadaVisivel;
@@ -72,6 +81,7 @@ class TelaTest {
                     descartadas,
                     cartaDaVez,
                     tipo instanceof TipoDeRodada.Escurinho ? List.of() : mao,
+                    Map.of(),
                     Map.of(VOCE, suasCartas, BOT, cartasDoBot),
                     vazas,
                     vazaAtual,
@@ -198,5 +208,43 @@ class TelaTest {
 
         assertThat(tela.opcao(new Descartar(0), visao.montar())).isEqualTo("Descartar 4♦ e comprar outra do baralho");
         assertThat(tela.opcao(new RecusarDescarte(), visao.montar())).isEqualTo("Não descartar");
+    }
+
+    @Test
+    @DisplayName("RG-2X2-9 e RG-2X2-10: no 2x2, a mesa mostra quem quer ver as cartas e a mão do parceiro enquanto a"
+            + " dupla se vê, e as opções falam do parceiro e da dupla adversária")
+    void duplas() {
+        Tela emDuplas = new Tela(narradorEmDuplas(), DUPLAS.variante());
+        // Davi pediu truco; o pedido é seu, e você e Carla quiseram se ver.
+        VisaoDoJogador visao = new VisaoDoJogador(
+                VOCE,
+                List.of(VOCE, BETO, CARLA, DAVI),
+                DUPLAS.equipes(),
+                new Placar(Map.of(SUA_DUPLA, 0, DUPLA_ADVERSARIA, 0)),
+                1,
+                DAVI,
+                new TipoDeRodada.Normal(),
+                new Aposta(1, Optional.empty(), Optional.of(new PedidoDeAumento(DAVI, VOCE, 3, List.of(CARLA, VOCE)))),
+                Optional.of(carta("6♣")),
+                List.of(),
+                Optional.empty(),
+                cartas("2♥ 3♣ J♦"),
+                Map.of(CARLA, cartas("A♠ 4♥ 5♦")),
+                Map.of(VOCE, 3, BETO, 3, CARLA, 3, DAVI, 3),
+                List.of(),
+                List.of(),
+                Optional.of(VOCE),
+                Optional.empty());
+
+        assertThat(emDuplas.mesa(visao))
+                .containsExactly(
+                        "Rodada 1 | vale 1 | sua dupla 0 x 0 dupla adversária | vira 6♣",
+                        "Davi pediu aumento para 3.",
+                        "Quer ver as cartas do parceiro: Carla e você.",
+                        "Mão de Carla: A♠ 4♥ 5♦",
+                        "Sua mão: [1] 2♥ [2] 3♣ [3] J♦ | Beto: 3 cartas | Carla: 3 cartas | Davi: 3 cartas");
+        assertThat(emDuplas.opcao(new VerCartasDoParceiro(), visao))
+                .isEqualTo("Ver as cartas de Carla (só se os dois quiserem; até a resposta)");
+        assertThat(emDuplas.opcao(new Correr(), visao)).isEqualTo("Correr (dupla adversária ganha 1 ponto)");
     }
 }

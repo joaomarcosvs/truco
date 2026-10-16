@@ -2,11 +2,13 @@ package io.github.joaomarcosvs.truco.cli;
 
 import io.github.joaomarcosvs.truco.bots.Arbitro;
 import io.github.joaomarcosvs.truco.bots.BotAleatorio;
+import io.github.joaomarcosvs.truco.bots.Estrategia;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.RodadaIniciada;
 import io.github.joaomarcosvs.truco.partida.ConfiguracaoDaPartida;
 import io.github.joaomarcosvs.truco.partida.Equipe;
+import io.github.joaomarcosvs.truco.partida.EquipeId;
 import io.github.joaomarcosvs.truco.partida.EstadoDaPartida;
 import io.github.joaomarcosvs.truco.partida.JogadorId;
 import io.github.joaomarcosvs.truco.partida.MotorDeTruco;
@@ -21,20 +23,32 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.LongSupplier;
 
 /**
- * Cliente de console para jogar uma partida de Truco Paulista contra o {@link BotAleatorio}. A seed da partida também
- * alimenta o bot: a mesma seed com as mesmas jogadas repete a partida inteira.
+ * Cliente de console para jogar uma partida de Truco Paulista contra o {@link BotAleatorio}: 1x1, ou 2x2 com um bot de
+ * parceiro contra dois bots. A seed da partida também alimenta os bots: a mesma seed com as mesmas jogadas repete a
+ * partida inteira.
  */
 public final class TrucoCli {
 
     static final JogadorId VOCE = new JogadorId("voce");
     static final JogadorId BOT = new JogadorId("bot");
 
-    private static final Map<JogadorId, String> NOMES = Map.of(VOCE, "você", BOT, "bot");
+    /** No 2x2, a sua parceira. */
+    static final JogadorId CARLA = new JogadorId("carla");
+
+    /** No 2x2, o adversário à sua direita. */
+    static final JogadorId BETO = new JogadorId("beto");
+
+    /** No 2x2, o parceiro do Beto, à sua esquerda. */
+    static final JogadorId DAVI = new JogadorId("davi");
+
+    private static final Map<JogadorId, String> NOMES =
+            Map.of(VOCE, "você", BOT, "bot", CARLA, "Carla", BETO, "Beto", DAVI, "Davi");
 
     private static final String USO = """
-            Uso: java -jar truco-cli.jar [--seed N] [--letras]
+            Uso: java -jar truco-cli.jar [--seed N] [--letras] [--2x2]
               --seed N   repete uma partida: a mesma seed com as mesmas jogadas dá a mesma partida
-              --letras   mostra os naipes com letras (c, e, o, p) em vez de símbolos""";
+              --letras   mostra os naipes com letras (c, e, o, p) em vez de símbolos
+              --2x2      joga em duplas: você e Carla contra Beto e Davi (os três são bots)""";
 
     private TrucoCli() {}
 
@@ -57,6 +71,7 @@ public final class TrucoCli {
     static int executar(String[] args, BufferedReader entrada, PrintStream saida, LongSupplier sorteioDaSeed) {
         Long seed = null;
         boolean letras = false;
+        boolean emDuplas = false;
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--seed" -> {
@@ -70,6 +85,7 @@ public final class TrucoCli {
                     }
                 }
                 case "--letras" -> letras = true;
+                case "--2x2" -> emDuplas = true;
                 case "--ajuda", "--help", "-h" -> {
                     saida.println(USO);
                     return 0;
@@ -81,20 +97,40 @@ public final class TrucoCli {
         }
         long seedDaPartida = seed != null ? seed : sorteioDaSeed.getAsLong();
         Notacao notacao = letras ? Notacao.LETRAS : Notacao.para(saida.charset());
-        return jogar(seedDaPartida, notacao, entrada, saida);
+        return jogar(seedDaPartida, emDuplas, notacao, entrada, saida);
     }
 
-    /** Joga uma partida contra o bot; devolve 0 se ela terminou e 1 se o jogador a interrompeu. */
-    static int jogar(long seed, Notacao notacao, BufferedReader entrada, PrintStream saida) {
-        ConfiguracaoDaPartida configuracao = new ConfiguracaoDaPartida(
-                List.of(Equipe.individual(VOCE), Equipe.individual(BOT)), new TrucoPaulista(), seed);
+    /** Joga uma partida contra os bots; devolve 0 se ela terminou e 1 se o jogador a interrompeu. */
+    static int jogar(long seed, boolean emDuplas, Notacao notacao, BufferedReader entrada, PrintStream saida) {
+        ConfiguracaoDaPartida configuracao = emDuplas
+                ? new ConfiguracaoDaPartida(
+                        List.of(
+                                new Equipe(new EquipeId("voce-carla"), List.of(VOCE, CARLA)),
+                                new Equipe(new EquipeId("beto-davi"), List.of(BETO, DAVI))),
+                        new TrucoPaulista(),
+                        seed)
+                : new ConfiguracaoDaPartida(
+                        List.of(Equipe.individual(VOCE), Equipe.individual(BOT)), new TrucoPaulista(), seed);
         MotorDeTruco motor = MotorDeTruco.novo();
         Narrador narrador = new Narrador(VOCE, NOMES, configuracao, notacao);
         JogadorHumano voce = new JogadorHumano(new Tela(narrador, configuracao.variante()), narrador, entrada, saida);
-        Arbitro arbitro = new Arbitro(motor, Map.of(VOCE, voce, BOT, new BotAleatorio(seed)));
+        // No 2x2, cada bot tem a própria seed, derivada da seed da partida.
+        Map<JogadorId, Estrategia> estrategias = emDuplas
+                ? Map.of(
+                        VOCE,
+                        voce,
+                        BETO,
+                        new BotAleatorio(seed),
+                        CARLA,
+                        new BotAleatorio(seed + 1),
+                        DAVI,
+                        new BotAleatorio(seed + 2))
+                : Map.of(VOCE, voce, BOT, new BotAleatorio(seed));
+        Arbitro arbitro = new Arbitro(motor, estrategias);
 
-        saida.println("Truco Paulista: você contra o bot. Seed %d (use --seed %d para repetir esta partida)."
-                .formatted(seed, seed));
+        String repetir = emDuplas ? "--2x2 --seed " + seed : "--seed " + seed;
+        saida.println("Truco Paulista: %s. Seed %d (use %s para repetir esta partida)."
+                .formatted(emDuplas ? "você e Carla contra Beto e Davi" : "você contra o bot", seed, repetir));
         if (notacao == Notacao.LETRAS) {
             saida.println("Naipes: c = copas, e = espadas, o = ouros, p = paus.");
         }

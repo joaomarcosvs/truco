@@ -10,11 +10,14 @@ import io.github.joaomarcosvs.truco.evento.CartaEncobertaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaRecebidaPorDescarte;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
+import io.github.joaomarcosvs.truco.evento.CartasDoParceiroVistas;
 import io.github.joaomarcosvs.truco.evento.DescarteEncerrado;
+import io.github.joaomarcosvs.truco.evento.DuplaViuAsCartas;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.JogadorCorreu;
 import io.github.joaomarcosvs.truco.evento.PartidaFinalizada;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
+import io.github.joaomarcosvs.truco.evento.QuisVerAsCartas;
 import io.github.joaomarcosvs.truco.evento.RodadaAnulada;
 import io.github.joaomarcosvs.truco.evento.RodadaDeOnzeIniciada;
 import io.github.joaomarcosvs.truco.evento.RodadaEscurinhoIniciada;
@@ -79,6 +82,11 @@ final class Narrador {
             case AumentoAceito aceito ->
                 "%s aceitou: a rodada vale %d.".formatted(nome(aceito.jogador()), aceito.valor());
             case JogadorCorreu correu -> "%s correu.".formatted(nome(correu.jogador()));
+            case QuisVerAsCartas quis -> "%s quer ver as cartas do parceiro.".formatted(nome(quis.jogador()));
+            case DuplaViuAsCartas viu -> "%s viu as cartas um do outro.".formatted(nome(viu.equipe()));
+            case CartasDoParceiroVistas vistas ->
+                "%s viu as cartas de %s: %s."
+                        .formatted(nome(vistas.jogador()), nome(vistas.parceiro()), cartas(vistas.cartas()));
             case RodadaFinalizada finalizada ->
                 "rodada %d: %s marcou %s."
                         .formatted(
@@ -118,16 +126,18 @@ final class Narrador {
         return nomes.getOrDefault(jogador, jogador.valor());
     }
 
-    /** O nome da equipe é o do seu primeiro jogador; na v1, cada equipe tem um jogador só. */
+    /** O nome da equipe: no 1x1, o do jogador dela; no 2x2, "sua dupla" ou "dupla adversária". */
     String nome(EquipeId equipe) {
         return configuracao.equipes().stream()
                 .filter(candidata -> candidata.id().equals(equipe))
                 .findFirst()
-                .map(candidata -> nome(candidata.jogadores().getFirst()))
+                .map(candidata -> candidata.jogadores().size() == 1
+                        ? nome(candidata.jogadores().getFirst())
+                        : candidata.jogadores().contains(voce) ? "sua dupla" : "dupla adversária")
                 .orElse(equipe.valor());
     }
 
-    /** O nome da equipe adversária; na v1, a partida é 1x1. */
+    /** O nome da equipe adversária: o truco tem sempre duas. */
     String nomeDoAdversario() {
         return nome(outrasEquipes(configuracao.equipeDe(voce)).findFirst().orElseThrow());
     }
