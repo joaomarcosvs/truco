@@ -2,24 +2,35 @@ package io.github.joaomarcosvs.truco.bots;
 
 import static io.github.joaomarcosvs.truco.bots.Partidas.ANA;
 import static io.github.joaomarcosvs.truco.bots.Partidas.BETO;
+import static io.github.joaomarcosvs.truco.bots.Partidas.CARLA;
+import static io.github.joaomarcosvs.truco.bots.Partidas.DAVI;
 import static io.github.joaomarcosvs.truco.bots.Partidas.EQUIPE_DA_ANA;
 import static io.github.joaomarcosvs.truco.bots.Partidas.EQUIPE_DO_BETO;
 import static io.github.joaomarcosvs.truco.bots.Partidas.MOTOR;
 import static io.github.joaomarcosvs.truco.bots.Partidas.configuracao;
+import static io.github.joaomarcosvs.truco.bots.Partidas.configuracaoEmDuplas;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
+import io.github.joaomarcosvs.truco.acao.Aceitar;
 import io.github.joaomarcosvs.truco.acao.JogarCarta;
+import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
+import io.github.joaomarcosvs.truco.acao.VerCartasDoParceiro;
+import io.github.joaomarcosvs.truco.evento.DuplaViuAsCartas;
+import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.partida.Aplicada;
 import io.github.joaomarcosvs.truco.partida.EstadoDaPartida;
 import io.github.joaomarcosvs.truco.partida.FaseDaRodada;
 import io.github.joaomarcosvs.truco.partida.JogadorId;
+import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -125,6 +136,63 @@ class ArbitroTest {
         assertThatIllegalStateException()
                 .isThrownBy(() -> arbitro.jogar(MOTOR.novaPartida(configuracao(2026)), (antes, j, a, ap) -> {}))
                 .withMessageContaining("fora das ações legais");
+    }
+
+    /**
+     * Roteiro para o 2x2: pede aumento quando a rodada vale 1; quem recebe o pedido quer ver as cartas e depois aceita;
+     * consultado fora da vez, só quer ver se o parceiro já quis. Fora isso, a primeira ação legal.
+     */
+    private record Roteiro(JogadorId jogador, List<String> registro) implements Estrategia {
+
+        @Override
+        public Acao decidir(VisaoDoJogador visao, List<Acao> legais) {
+            if (legais.contains(new VerCartasDoParceiro())) {
+                registro.add(jogador + " quer ver");
+                return new VerCartasDoParceiro();
+            }
+            if (legais.contains(new Aceitar())) {
+                registro.add(jogador + " aceita");
+                return new Aceitar();
+            }
+            if (legais.contains(new PedirAumento()) && visao.aposta().valor() == 1) {
+                return new PedirAumento();
+            }
+            return legais.getFirst();
+        }
+
+        @Override
+        public Optional<Acao> decidirOpcional(VisaoDoJogador visao, List<Acao> legais) {
+            boolean parceiroQuis = visao.aposta()
+                    .pedidoPendente()
+                    .filter(pedido -> !pedido.queremVerAsCartas().isEmpty())
+                    .isPresent();
+            registro.add(jogador + (parceiroQuis ? " também quer ver" : " não quer ver"));
+            return parceiroQuis ? Optional.of(new VerCartasDoParceiro()) : Optional.empty();
+        }
+    }
+
+    @Test
+    @DisplayName("RG-2X2-9: o parceiro de quem recebe o pedido é consultado antes, pode não querer ver as cartas e é"
+            + " consultado de novo quando quem recebeu passa a querer")
+    void parceiroConsultadoNoAumento() {
+        List<String> registro = new ArrayList<>();
+        Map<JogadorId, Estrategia> roteiros = new HashMap<>();
+        for (JogadorId jogador : List.of(ANA, BETO, CARLA, DAVI)) {
+            roteiros.put(jogador, new Roteiro(jogador, registro));
+        }
+        List<Evento> eventos = new ArrayList<>();
+
+        new Arbitro(MOTOR, roteiros)
+                .jogar(MOTOR.novaPartida(configuracaoEmDuplas(2026)), (antes, jogador, acao, aplicada) -> {
+                    if (antes.numeroDaRodada() == 1) {
+                        eventos.addAll(aplicada.eventos());
+                    }
+                });
+
+        // Na seed 2026, Carla dá as cartas, Davi abre e pede truco, e quem recebe é a Ana.
+        assertThat(registro.subList(0, 4))
+                .containsExactly("carla não quer ver", "ana quer ver", "carla também quer ver", "ana aceita");
+        assertThat(eventos).contains(new DuplaViuAsCartas(EQUIPE_DA_ANA));
     }
 
     @Test

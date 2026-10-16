@@ -10,6 +10,7 @@ import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
+import io.github.joaomarcosvs.truco.acao.VerCartasDoParceiro;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.AumentoAceito;
 import io.github.joaomarcosvs.truco.evento.AumentoPedido;
@@ -18,11 +19,14 @@ import io.github.joaomarcosvs.truco.evento.CartaEncobertaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.CartaRecebidaPorDescarte;
 import io.github.joaomarcosvs.truco.evento.CartasDistribuidas;
+import io.github.joaomarcosvs.truco.evento.CartasDoParceiroVistas;
 import io.github.joaomarcosvs.truco.evento.DescarteEncerrado;
+import io.github.joaomarcosvs.truco.evento.DuplaViuAsCartas;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.JogadorCorreu;
 import io.github.joaomarcosvs.truco.evento.PartidaFinalizada;
 import io.github.joaomarcosvs.truco.evento.PlacarAtualizado;
+import io.github.joaomarcosvs.truco.evento.QuisVerAsCartas;
 import io.github.joaomarcosvs.truco.evento.RodadaAnulada;
 import io.github.joaomarcosvs.truco.evento.RodadaDeOnzeIniciada;
 import io.github.joaomarcosvs.truco.evento.RodadaEscurinhoIniciada;
@@ -63,6 +67,7 @@ final class Conversor {
             case PedirAumento pedido -> new AcaoDto.PedirAumento();
             case Aceitar aceite -> new AcaoDto.Aceitar();
             case Correr corrida -> new AcaoDto.Correr();
+            case VerCartasDoParceiro ver -> new AcaoDto.VerCartasDoParceiro();
         };
     }
 
@@ -75,6 +80,7 @@ final class Conversor {
             case AcaoDto.PedirAumento pedido -> new PedirAumento();
             case AcaoDto.Aceitar aceite -> new Aceitar();
             case AcaoDto.Correr corrida -> new Correr();
+            case AcaoDto.VerCartasDoParceiro ver -> new VerCartasDoParceiro();
         };
     }
 
@@ -96,6 +102,10 @@ final class Conversor {
             case AumentoPedido e -> new EventoDto.AumentoPedido(id(e.pedinte()), e.nivelProposto());
             case AumentoAceito e -> new EventoDto.AumentoAceito(id(e.jogador()), e.valor());
             case JogadorCorreu e -> new EventoDto.JogadorCorreu(id(e.jogador()));
+            case QuisVerAsCartas e -> new EventoDto.QuisVerAsCartas(id(e.jogador()));
+            case DuplaViuAsCartas e -> new EventoDto.DuplaViuAsCartas(id(e.equipe()));
+            case CartasDoParceiroVistas e ->
+                new EventoDto.CartasDoParceiroVistas(id(e.jogador()), id(e.parceiro()), dtos(e.cartas()));
             case RodadaFinalizada e ->
                 new EventoDto.RodadaFinalizada(e.numeroDaRodada(), id(e.vencedora()), e.pontos());
             case RodadaAnulada e -> new EventoDto.RodadaAnulada(e.numeroDaRodada());
@@ -125,6 +135,10 @@ final class Conversor {
             case EventoDto.AumentoPedido e -> new AumentoPedido(jogador(e.pedinte()), e.nivelProposto());
             case EventoDto.AumentoAceito e -> new AumentoAceito(jogador(e.jogador()), e.valor());
             case EventoDto.JogadorCorreu e -> new JogadorCorreu(jogador(e.jogador()));
+            case EventoDto.QuisVerAsCartas e -> new QuisVerAsCartas(jogador(e.jogador()));
+            case EventoDto.DuplaViuAsCartas e -> new DuplaViuAsCartas(equipe(e.equipe()));
+            case EventoDto.CartasDoParceiroVistas e ->
+                new CartasDoParceiroVistas(jogador(e.jogador()), jogador(e.parceiro()), cartas(e.cartas()));
             case EventoDto.RodadaFinalizada e ->
                 new RodadaFinalizada(e.numeroDaRodada(), equipe(e.vencedora()), e.pontos());
             case EventoDto.RodadaAnulada e -> new RodadaAnulada(e.numeroDaRodada());
@@ -151,6 +165,7 @@ final class Conversor {
                 dtos(visao.descartadas()),
                 visao.cartaDaVezNoDescarte().map(Conversor::dto),
                 dtos(visao.mao()),
+                maosDosParceiros(visao.maosDosParceiros()),
                 ordenado(visao.cartasNaMao(), Conversor::id),
                 listar(visao.vazas(), vaza -> new VisaoDto.Vaza(dtosDeJogadas(vaza.jogadas()), dto(vaza.resultado()))),
                 dtosDeJogadas(visao.vazaAtual()),
@@ -174,6 +189,8 @@ final class Conversor {
                 cartas(dto.descartadas()),
                 dto.cartaDaVezNoDescarte().map(Conversor::carta),
                 cartas(dto.mao()),
+                dto.maosDosParceiros().entrySet().stream()
+                        .collect(toMap(entrada -> jogador(entrada.getKey()), entrada -> cartas(entrada.getValue()))),
                 dto.cartasNaMao().entrySet().stream()
                         .collect(toMap(entrada -> jogador(entrada.getKey()), Map.Entry::getValue)),
                 listar(dto.vazas(), vaza -> new VazaVisivel(jogadas(vaza.jogadas()), resultado(vaza.resultado()))),
@@ -221,7 +238,10 @@ final class Conversor {
                 aposta.ultimaEquipeQueAceitou().map(Conversor::id),
                 aposta.pedidoPendente()
                         .map(pedido -> new VisaoDto.PedidoDeAumento(
-                                id(pedido.pedinte()), id(pedido.respondedor()), pedido.nivelProposto())));
+                                id(pedido.pedinte()),
+                                id(pedido.respondedor()),
+                                pedido.nivelProposto(),
+                                listar(pedido.queremVerAsCartas(), Conversor::id))));
     }
 
     private static Aposta aposta(VisaoDto.Aposta dto) {
@@ -230,7 +250,10 @@ final class Conversor {
                 dto.ultimaEquipeQueAceitou().map(Conversor::equipe),
                 dto.pedidoPendente()
                         .map(pedido -> new PedidoDeAumento(
-                                jogador(pedido.pedinte()), jogador(pedido.respondedor()), pedido.nivelProposto())));
+                                jogador(pedido.pedinte()),
+                                jogador(pedido.respondedor()),
+                                pedido.nivelProposto(),
+                                listar(pedido.queremVerAsCartas(), Conversor::jogador))));
     }
 
     private static List<VisaoDto.Jogada> dtosDeJogadas(List<JogadaVisivel> jogadas) {
@@ -255,6 +278,13 @@ final class Conversor {
     private static Placar placar(Map<String, Integer> dto) {
         return new Placar(
                 dto.entrySet().stream().collect(toMap(entrada -> equipe(entrada.getKey()), Map.Entry::getValue)));
+    }
+
+    /** As mãos dos parceiros como objeto JSON, com os jogadores em ordem alfabética, para o JSON sair sempre igual. */
+    private static Map<String, List<CartaDto>> maosDosParceiros(Map<JogadorId, List<Carta>> maos) {
+        Map<String, List<CartaDto>> ordenado = new TreeMap<>();
+        maos.forEach((jogador, cartas) -> ordenado.put(id(jogador), dtos(cartas)));
+        return ordenado;
     }
 
     private static <K> Map<String, Integer> ordenado(Map<K, Integer> mapa, Function<K, String> chave) {

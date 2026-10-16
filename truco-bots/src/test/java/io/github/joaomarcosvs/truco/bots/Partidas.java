@@ -13,6 +13,11 @@ final class Partidas {
 
     static final JogadorId ANA = new JogadorId("ana");
     static final JogadorId BETO = new JogadorId("beto");
+    /** No 2x2, parceira da Ana. */
+    static final JogadorId CARLA = new JogadorId("carla");
+    /** No 2x2, parceiro do Beto. */
+    static final JogadorId DAVI = new JogadorId("davi");
+
     static final EquipeId EQUIPE_DA_ANA = new EquipeId("ana");
     static final EquipeId EQUIPE_DO_BETO = new EquipeId("beto");
     static final MotorDeTruco MOTOR = MotorDeTruco.novo();
@@ -23,5 +28,15 @@ final class Partidas {
     static ConfiguracaoDaPartida configuracao(long seed) {
         return new ConfiguracaoDaPartida(
                 List.of(Equipe.individual(ANA), Equipe.individual(BETO)), new TrucoPaulista(), seed);
+    }
+
+    /** Partida 2x2 de Truco Paulista: Ana e Carla contra Beto e Davi, sentados na ordem Ana, Beto, Carla, Davi. */
+    static ConfiguracaoDaPartida configuracaoEmDuplas(long seed) {
+        return new ConfiguracaoDaPartida(
+                List.of(
+                        new Equipe(EQUIPE_DA_ANA, List.of(ANA, CARLA)),
+                        new Equipe(EQUIPE_DO_BETO, List.of(BETO, DAVI))),
+                new TrucoPaulista(),
+                seed);
     }
 }

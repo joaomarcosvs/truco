@@ -17,7 +17,7 @@ A variante da v1 é o **Truco Paulista**. Truco Mineiro e Gaudério virão muito
 Tudo o que for feito agora serve para entregar um core **completo, correto, testado e jogável por linha de comando**.
 
 **Dentro do escopo agora**
-- Regras do truco paulista, 1x1, no módulo `truco-core`
+- Regras do truco paulista, 1x1 e 2x2, no módulo `truco-core`
 - Bot aleatório e CLI de desenvolvimento para jogar e testar
 - Testes (unitários, de cenário e de propriedade)
 - Módulo de protocolo (DTOs + JSON) no penúltimo marco
@@ -27,7 +27,6 @@ Tudo o que for feito agora serve para entregar um core **completo, correto, test
 - Servidor, rede, WebSocket
 - Cliente Unity e qualquer UI gráfica
 - Contas, matchmaking, persistência
-- 2x2 e as regras da seção 11 do documento de regras (apenas deixe o modelo preparado). As decisões do 2x2 vão sendo registradas na seção 11 e na tabela da seção 12. Uma delas já afeta o core: pela RG-2X2-4, empatar com o parceiro empata a vaza, mas hoje `RegrasDeVazaPaulista.resultado` dá a vaza à equipe quando as mais fortes são da mesma equipe. No 1x1 isso não faz diferença; corrija no marco do 2x2, com teste.
 - Truco Mineiro e Gaudério (apenas respeite a seção 7)
 - Bots avançados
 
@@ -39,7 +38,7 @@ Se uma tarefa parecer exigir algo fora do escopo, pare e pergunte.
 - Maven multi-módulo, sempre pelo Maven Wrapper (`./mvnw`, Maven 3.9.16). Requer `JAVA_HOME` apontando para um JDK 21+.
 - JUnit 5, AssertJ, jqwik (testes de propriedade)
 - Comandos: `./mvnw -q test` · `./mvnw -q -pl truco-core test` · `./mvnw -q verify` · `./mvnw spotless:apply` (formata o código)
-- Jogar contra o bot: `./mvnw -q package -DskipTests` e depois `java -jar truco-cli/target/truco-cli.jar [--seed N] [--letras]`
+- Jogar contra o bot: `./mvnw -q package -DskipTests` e depois `java -jar truco-cli/target/truco-cli.jar [--seed N] [--letras] [--2x2]` (com `--2x2`, você e um bot de parceiro contra dois bots)
 - No navegador: `java -jar truco-web/target/truco-web.jar` e abrir http://localhost:8080
 - groupId: `io.github.joaomarcosvs` · pacote base: `io.github.joaomarcosvs.truco` (bots em `...truco.bots`, CLI em `...truco.cli`)
 - CI: GitHub Actions (`.github/workflows/ci.yml`) roda `./mvnw verify` a cada push na `main` e em pull requests
@@ -63,7 +62,7 @@ Futuros, fora deste repo ou deste escopo: `truco-server` (Java) e o cliente Unit
 1. **Core puro.** Nada de Spring, Jackson, bibliotecas de log ou qualquer dependência de runtime em `truco-core`. Serialização fica em `truco-protocol`.
 2. **Estado imutável e motor puro.** `aplicar(estado, jogador, acao)` devolve novo estado + eventos. Sem efeitos colaterais, sem I/O, sem relógio, sem `Math.random()`.
 3. **Determinismo.** Toda aleatoriedade vem de uma seed guardada no estado; o embaralhamento de cada rodada (e a reposição do descarte) deriva de `(seed, numeroDaRodada)`. Mesma seed + mesmas ações = mesma partida.
-4. **Informação oculta.** `VisaoDoJogador` e os eventos entregues a um jogador nunca vazam: cartas alheias, ordem do baralho, identidade de carta encoberta do adversário, nem **quem tem a carta da vez no descarte** (RG-DESC-10).
+4. **Informação oculta.** `VisaoDoJogador` e os eventos entregues a um jogador nunca vazam: cartas alheias, ordem do baralho, identidade de carta encoberta do adversário, nem **quem tem a carta da vez no descarte** (RG-DESC-10). A única exceção é a mão do parceiro, no 2x2, nos momentos em que a dupla se vê (RG-2X2-10 e RG-2X2-11).
 5. **Entrada inválida não lança exceção.** Ação ilegal retorna `Rejeitada(motivo)`. Exceções são só para bugs.
 6. **Regras vivem na variante.** Nenhuma constante de regra (12 pontos, 40 cartas, 3 vazas, escada 1/3/6/9/12, ordem de força, manilha, sequência de descarte) fora de `...regras`. O motor pergunta à `VarianteDeRegras`.
 7. **Nomes genéricos no motor.** Use `PedirAumento`, `EscadaDeApostas`, `Aposta`, não `PedirTruco` em código que servirá a outras variantes.
@@ -80,7 +79,7 @@ Pacotes sob o pacote base: `carta`, `regras`, `partida`, `acao`, `evento`, `visa
 
 **Valores e entidades**
 - `Naipe`, `Valor`, `Carta` (record), `Baralho` (composição definida pela variante)
-- `JogadorId`, `EquipeId`, `Equipe` (v1: uma equipe por jogador, mas o modelo já suporta duplas)
+- `JogadorId`, `EquipeId`, `Equipe` (um jogador no 1x1, uma dupla no 2x2)
 - `ConfiguracaoDaPartida` (jogadores/equipes, variante, seed)
 - `EstadoDaPartida`: placar, número da rodada, carteador, seed, rodada atual
 - `Rodada`, `Vaza`, `Jogada`
@@ -102,7 +101,7 @@ public record Aplicada(EstadoDaPartida novoEstado, List<Evento> eventos) impleme
 public record Rejeitada(MotivoDeRejeicao motivo) implements Resultado {}
 
 public sealed interface Acao permits JogarCarta, JogarEncoberta, Descartar, RecusarDescarte,
-                                     PedirAumento, Aceitar, Correr {}
+                                     PedirAumento, Aceitar, Correr, VerCartasDoParceiro {}
 ```
 
 **Ações** (todas referenciam a carta pela posição na mão, `indiceNaMao`, porque na Rodada Escurinho o jogador joga sem ver)
@@ -111,11 +110,12 @@ public sealed interface Acao permits JogarCarta, JogarEncoberta, Descartar, Recu
 - `PedirAumento()`: o nível é sempre o próximo da escada. Se houver pedido pendente, significa "aceito e aumento".
 - `Aceitar()`: aceita um aumento ou, na Rodada de Onze, decide jogar.
 - `Correr()`: recusa um aumento ou, na Rodada de Onze, decide não jogar. Na própria vez não se corre (RG-AUM-6).
+- `VerCartasDoParceiro()`: no 2x2, com um pedido de aumento pendente, quem o recebeu e o parceiro querem se ver; quando todos querem, eles se veem até a resposta (RG-2X2-9, RG-2X2-10). É opcional: a partida não espera por ela.
 
 **Eventos** (sealed `Evento`, cada um com `Visibilidade`: `PUBLICO` ou `PRIVADO(jogador)`)
-`RodadaIniciada`, `CartasDistribuidas` (privado), `CartaDescartada` (público, com a carta), `CartaRecebidaPorDescarte` (privado), `DescarteEncerrado` (público), `CartaJogada`, `CartaEncobertaJogada` (público, sem a identidade), `VazaFinalizada`, `AumentoPedido`, `AumentoAceito`, `JogadorCorreu`, `RodadaFinalizada`, `RodadaAnulada`, `PlacarAtualizado`, `PartidaFinalizada`, `RodadaDeOnzeIniciada`, `RodadaEscurinhoIniciada`.
+`RodadaIniciada`, `CartasDistribuidas` (privado), `CartaDescartada` (público, com a carta), `CartaRecebidaPorDescarte` (privado), `DescarteEncerrado` (público), `CartaJogada`, `CartaEncobertaJogada` (público, sem a identidade), `VazaFinalizada`, `AumentoPedido`, `AumentoAceito`, `JogadorCorreu`, `RodadaFinalizada`, `RodadaAnulada`, `PlacarAtualizado`, `PartidaFinalizada`, `RodadaDeOnzeIniciada`, `RodadaEscurinhoIniciada` e, no 2x2, `QuisVerAsCartas`, `DuplaViuAsCartas` (públicos) e `CartasDoParceiroVistas` (privado).
 
-**Bots:** `Estrategia { Acao decidir(VisaoDoJogador visao, List<Acao> legais); }`
+**Bots:** `Estrategia { Acao decidir(VisaoDoJogador visao, List<Acao> legais); }`, e `decidirOpcional`, que pode não fazer nada, para as ações opcionais.
 
 ## 6. Testes
 
@@ -146,6 +146,7 @@ Princípio: **o motor é genérico; a variante é dado + estratégia.**
 | `RegrasDeDescarte` | sequência de descarte e quando é permitido |
 | `RegrasEspeciais` | Rodada de Onze, Rodada Escurinho e afins |
 | `PontuacaoDaPartida` | pontos para vencer |
+| `RegrasDeDupla` | formatos aceitos (1x1, 2x2) e o que os parceiros veem um do outro |
 
 `TrucoPaulista` é a primeira implementação, com `OpcoesTrucoPaulista` para as regras `[A CONFIRMAR]`.
 
@@ -182,6 +183,7 @@ O que isso exige do desenho de hoje:
 | M8 | Jogável: `truco-bots` (`BotAleatorio`) + `truco-cli` humano x bot + fuzz global | uma partida completa jogável no terminal |
 | M9 | `truco-protocol`: DTOs e JSON de `Acao`, `Evento`, `VisaoDoJogador` | testes de ida e volta (round-trip) |
 | M10 | Teste de prontidão de variante (seção 7) | variante mínima funciona sem mexer no motor |
+| M11 | 2x2: duplas na mesa, empate entre parceiros, ver as cartas do parceiro, Rodada de Onze em duplas, CLI `--2x2` | `RG-2X2-*` testadas |
 
 ## 10. Como trabalhar neste repo
 
@@ -204,6 +206,7 @@ O que isso exige do desenho de hoje:
 - [x] M8 Jogável (bots + CLI)
 - [x] M9 Protocolo
 - [x] M10 Prontidão de variante
+- [x] M11 2x2
 
 **Decisões registradas**
 - **M1** Build: Maven Wrapper com Maven 3.9.16, `maven.compiler.release` 21, `-Xlint:all` com warnings tratados como erro e versões de plugins fixadas no POM pai.
@@ -295,3 +298,17 @@ O que isso exige do desenho de hoje:
   - Descarte, como o usuário definiu: quem tem a carta da vez pode descartá-la até a primeira ação de quem vem depois do descarte (jogar, pedir aumento ou decidir a Onze). Essa ação fecha o descarte, e o servidor responde "não descartar" por todos antes de aplicá-la (RG-DESC-1 e RG-DESC-2). Não há prazo, e a sala não guarda resposta pendente, então quem não tem a carta não distingue "o dono não descartou" de "ninguém tinha" (RG-DESC-10, com teste). As opções de quem vem depois do descarte são as ações legais do estado em que todos recusaram; o motor puro permite calcular isso sem aplicar nada.
   - Contra o bot continua igual, com o descarte como fase em que você responde, porque o bot agiria antes de você poder descartar.
   - `Passo` saiu de `PartidaReconstituida` para servir aos dois modos. Os testes de informação oculta usam `CartasOcultas`, que vale para qualquer jogador; uma propriedade joga partidas inteiras numa sala, com escolhas aleatórias dos dois lados, e confere que nada vaza e que a seed não aparece.
+- **M11** 2x2 (aprovado). `FaseDaRodada` e `MotorDeTruco` não mudaram. O que mudou:
+  - a `VarianteDeRegras` ganhou a peça `RegrasDeDupla`: quantos jogadores por equipe a variante aceita (1 ou 2 no paulista), se a dupla que recebe um aumento pode se ver e se a dupla com 11 se vê na decisão da Onze;
+  - `novaPartida` aceita duas equipes do tamanho que a variante aceita, e `ConfiguracaoDaPartida.parceirosDe` dá os parceiros de um jogador (nenhum no 1x1);
+  - a `RegrasDeVazaPaulista` empata a vaza quando as mais fortes empatam, mesmo entre parceiros (RG-2X2-4), e a Rodada de Onze é decidida pelo jogador da dupla com 11 que joga primeiro na 1ª vaza (RG-2X2-12). No 1x1 as duas coisas dão o mesmo de antes;
+  - `Acao` ganhou `VerCartasDoParceiro`; `Evento` ganhou `QuisVerAsCartas` e `DuplaViuAsCartas` (públicos) e `CartasDoParceiroVistas` (privado); `PedidoDeAumento` ganhou `queremVerAsCartas` (com um construtor de 3 argumentos para o pedido novo); `VisaoDoJogador` ganhou `maosDosParceiros`.
+- **M11** Ver as cartas acontece dentro de `AguardandoRespostaDeAumento`, sem fase nova:
+  - quem recebeu o pedido e o parceiro têm `VerCartasDoParceiro`, uma vez cada; quando todos da dupla querem, saem `DuplaViuAsCartas` e um `CartasDoParceiroVistas` para cada um, e a visão mostra a mão do parceiro até a resposta;
+  - quem recebeu pode responder sem esperar, e a resposta encerra a chance;
+  - na Rodada de Onze, o `aplicar` que leva à decisão emite os `CartasDoParceiroVistas` da dupla com 11, e a visão mostra as mãos até a decisão.
+- **M11** Testes: `DuplasTest` com um teste por regra (RG-2X2-3 a 15), casos de 2x2 nas regras de vaza e na distribuição, e um golden 2x2 (seed 2026). As propriedades do core, o fuzz dos bots e a ida e volta do protocolo jogam 1x1 e 2x2; a mão do parceiro é conferida contra uma regra escrita de novo nos testes, e um teste de mutação (mostrar sempre a mão do parceiro) confirmou que as propriedades pegam o vazamento.
+- **M11** Bots e CLI:
+  - `Estrategia` ganhou o método `default` `decidirOpcional`, que pode devolver vazio. O `Arbitro` consulta, antes de quem tem a vez, quem só tem ações opcionais (`VerCartasDoParceiro`), uma vez a cada mudança do pedido; assim o parceiro pode não querer ver, e é consultado de novo quando o outro passa a querer. O `BotAleatorio` diz sim ou não ao acaso. No 1x1 nada disso acontece, e os resultados fixados não mudaram;
+  - a CLI ganhou `--2x2`: você e Carla contra Beto e Davi, bots com as seeds `seed`, `seed + 1` e `seed + 2`. O `JogadorHumano` oferece "Não ver as cartas" quando é consultado fora da vez, o `Narrador` chama as equipes de "sua dupla" e "dupla adversária", e a `Tela` mostra a mão do parceiro quando a dupla se vê.
+- **M11** Protocolo: DTOs da ação, dos eventos e dos campos novos (`maosDosParceiros` sai com os jogadores em ordem alfabética). O `docs/protocolo.md` ganhou os exemplos novos e um exemplo de visão no 2x2, e o teste da documentação passou a aceitar mais de um exemplo de visão.

@@ -64,6 +64,14 @@ public record ConfiguracaoDaPartida(List<Equipe> equipes, VarianteDeRegras varia
         return equipes.stream().anyMatch(equipe -> equipe.jogadores().contains(jogador));
     }
 
+    /** Os parceiros do jogador: os outros jogadores da equipe dele, na ordem da mesa. No 1x1, nenhum. */
+    public List<JogadorId> parceirosDe(JogadorId jogador) {
+        EquipeId equipe = equipeDe(jogador);
+        return jogadoresNaOrdemDaMesa().stream()
+                .filter(outro -> !outro.equals(jogador) && equipeDe(outro).equals(equipe))
+                .toList();
+    }
+
     /** A equipe do jogador. */
     public EquipeId equipeDe(JogadorId jogador) {
         return equipes.stream()

@@ -18,6 +18,7 @@ record VisaoDto(
         List<CartaDto> descartadas,
         Optional<CartaDto> cartaDaVezNoDescarte,
         List<CartaDto> mao,
+        Map<String, List<CartaDto>> maosDosParceiros,
         Map<String, Integer> cartasNaMao,
         List<Vaza> vazas,
         List<Jogada> vazaAtual,
@@ -28,7 +29,7 @@ record VisaoDto(
 
     record Aposta(int valor, Optional<String> ultimaEquipeQueAceitou, Optional<PedidoDeAumento> pedidoPendente) {}
 
-    record PedidoDeAumento(String pedinte, String respondedor, int nivelProposto) {}
+    record PedidoDeAumento(String pedinte, String respondedor, int nivelProposto, List<String> queremVerAsCartas) {}
 
     /** Uma jogada como o jogador a vê: a carta encoberta dos outros vem como {@code null}. */
     record Jogada(String jogador, Optional<CartaDto> carta, boolean encoberta) {}

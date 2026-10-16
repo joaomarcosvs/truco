@@ -26,8 +26,8 @@ Cada regra tem um ID (`RG-...`). Todo teste de regra cita o ID.
 
 ## 1. Escopo da v1
 
-- **RG-ESC-1 [PROJETO]** A v1 é **1x1** (dois jogadores). O modelo já usa `Equipe` para suportar 2x2 (duas duplas) no futuro.
-- **RG-ESC-2 [PROJETO]** Tudo que depende de parceiros (seção 11) fica fora da v1.
+- **RG-ESC-1 [PROJETO]** A v1 tem dois formatos: **1x1** (dois jogadores) e **2x2** (duas duplas, com os parceiros frente a frente). Cada equipe é uma `Equipe`.
+- **RG-ESC-2 [PROJETO]** O que depende de parceiros está na seção 11 e só vale no 2x2.
 
 ## 2. Baralho e cartas
 
@@ -140,9 +140,9 @@ Cada regra tem um ID (`RG-...`). Todo teste de regra cita o ID.
 - **RG-VIS-3 [DEFINIDA]** Na Rodada Escurinho, o jogador não recebe a identidade das próprias cartas.
 - **RG-VIS-4 [PROJETO]** O descarte segue RG-DESC-8 e RG-DESC-10: a carta reposta é privada e o core não revela quem tinha a carta da vez.
 
-## 11. Regras do 2x2 (futuro)
+## 11. Regras do 2x2
 
-O 2x2 fica fora da v1 (RG-ESC-2). Esta seção reúne as regras para o marco que o implementar. Todas foram decididas pelo autor em 15/10/2026 (as decisões estão na tabela da seção 12) e estão marcadas `[FUTURO]`.
+São as regras do 2x2, decididas pelo autor em 15/10/2026 (as decisões estão na tabela da seção 12) e implementadas no marco M11.
 
 Fora o que esta seção muda, valem as seções 2 a 10. Onde uma regra diz que um jogador vence, pontua, aceita, corre ou tem o direito de aumentar, no 2x2 é a **dupla** dele.
 
@@ -152,27 +152,27 @@ Nomes dos jogadores, salas, como cada um escolhe a dupla e o que fazer quando fa
 
 **Mesa e distribuição**
 
-- **RG-2X2-1 [FUTURO]** São **duas duplas**, quatro jogadores. Os parceiros sentam **frente a frente**, então a ordem à direita alterna as duplas: A1, B1, A2, B2.
-- **RG-2X2-2 [FUTURO]** Vale a ordem à direita (RG-PARTIDA-4):
+- **RG-2X2-1 [DEFINIDA]** São **duas duplas**, quatro jogadores. Os parceiros sentam **frente a frente**, então a ordem à direita alterna as duplas: A1, B1, A2, B2.
+- **RG-2X2-2 [DEFINIDA]** Vale a ordem à direita (RG-PARTIDA-4):
   - o carteador da 1ª rodada é sorteado entre os quatro e passa para a direita a cada rodada;
   - cada jogador recebe 3 cartas, uma por vez, a começar pelo jogador à direita do carteador, que abre a 1ª vaza;
   - ficam 12 cartas nas mãos, a vira e 27 no baralho.
 
 **Vazas**
 
-- **RG-2X2-3 [FUTURO]** Em cada vaza, os quatro jogam uma carta, um de cada vez, na ordem à direita. A carta aberta mais forte vence a vaza para a **dupla** de quem a jogou. A dupla que vencer 2 vazas vence a rodada, e os empates seguem RG-EMP-1 a RG-EMP-5 entre as duplas. Se só um jogador joga carta aberta e os outros três encobrem, a dupla dele vence a vaza (RG-ENC-2).
-- **RG-2X2-4 [FUTURO]** **Empate:** se as cartas abertas mais fortes empatam (mesmo valor, nenhuma manilha), a vaza **empata**, sejam elas de duplas diferentes ou **da mesma dupla**. Empatar com o parceiro é como empatar com o adversário.
-- **RG-2X2-5 [FUTURO]** **Quem abre a vaza seguinte:** quem jogou a carta vencedora (RG-VAZA-2); depois de uma vaza empatada, quem abriu a vaza empatada (RG-EMP-6). Como empatar com o parceiro empata a vaza (RG-2X2-4), não há outro caso.
+- **RG-2X2-3 [DEFINIDA]** Em cada vaza, os quatro jogam uma carta, um de cada vez, na ordem à direita. A carta aberta mais forte vence a vaza para a **dupla** de quem a jogou. A dupla que vencer 2 vazas vence a rodada, e os empates seguem RG-EMP-1 a RG-EMP-5 entre as duplas. Se só um jogador joga carta aberta e os outros três encobrem, a dupla dele vence a vaza (RG-ENC-2).
+- **RG-2X2-4 [DEFINIDA]** **Empate:** se as cartas abertas mais fortes empatam (mesmo valor, nenhuma manilha), a vaza **empata**, sejam elas de duplas diferentes ou **da mesma dupla**. Empatar com o parceiro é como empatar com o adversário.
+- **RG-2X2-5 [DEFINIDA]** **Quem abre a vaza seguinte:** quem jogou a carta vencedora (RG-VAZA-2); depois de uma vaza empatada, quem abriu a vaza empatada (RG-EMP-6). Como empatar com o parceiro empata a vaza (RG-2X2-4), não há outro caso.
 
 **Aumentos e cartas do parceiro**
 
-- **RG-2X2-6 [FUTURO]** **Quem pode pedir:**
+- **RG-2X2-6 [DEFINIDA]** **Quem pode pedir:**
   - só o jogador da vez, antes de jogar, sem pedido pendente (RG-AUM-2);
   - o direito de aumentar (RG-AUM-5) é da **dupla** que aceitou o último aumento: qualquer um dos dois pode pedir o próximo nível, na sua vez.
-- **RG-2X2-7 [FUTURO]** **Quem recebe o pedido:** o adversário à direita de quem pediu, que é o próximo a jogar. Num "pedir mais" (RG-AUM-3), recebe quem tinha pedido.
-- **RG-2X2-8 [FUTURO]** **Quem recebeu o pedido responde pela dupla:** aceita, corre ou pede mais (RG-AUM-3). Correndo, a dupla adversária ganha os pontos de RG-AUM-4.
-- **RG-2X2-9 [FUTURO]** **Ver as cartas do parceiro:** ao receber um pedido de aumento, a dupla que recebeu pode ver as cartas uma da outra antes de responder. É **decisão da dupla**: só acontece se os dois parceiros quiserem. Quem fez o pedido **não** vê as cartas do parceiro.
-- **RG-2X2-10 [FUTURO]** **Para que e por quanto tempo:** ver as cartas do parceiro serve para a dupla **combinar a resposta**. Se as cartas do parceiro forem ruins, por exemplo, a dupla pode decidir correr.
+- **RG-2X2-7 [DEFINIDA]** **Quem recebe o pedido:** o adversário à direita de quem pediu, que é o próximo a jogar. Num "pedir mais" (RG-AUM-3), recebe quem tinha pedido.
+- **RG-2X2-8 [DEFINIDA]** **Quem recebeu o pedido responde pela dupla:** aceita, corre ou pede mais (RG-AUM-3). Correndo, a dupla adversária ganha os pontos de RG-AUM-4.
+- **RG-2X2-9 [DEFINIDA]** **Ver as cartas do parceiro:** ao receber um pedido de aumento, a dupla que recebeu pode ver as cartas uma da outra antes de responder. É **decisão da dupla**: só acontece se os dois parceiros quiserem. Quem fez o pedido **não** vê as cartas do parceiro.
+- **RG-2X2-10 [DEFINIDA]** **Para que e por quanto tempo:** ver as cartas do parceiro serve para a dupla **combinar a resposta**. Se as cartas do parceiro forem ruins, por exemplo, a dupla pode decidir correr.
   - Só acontece enquanto o pedido está pendente, e só se os dois quiserem (RG-2X2-9).
   - A mão do parceiro aparece **só até a dupla responder**; respondido o pedido, ela volta a ficar escondida.
   - Quem recebeu o pedido dá a resposta pela dupla (RG-2X2-8).
@@ -180,18 +180,18 @@ Nomes dos jogadores, salas, como cada um escolhe a dupla e o que fazer quando fa
 
 **Rodada de Onze e Rodada Escurinho**
 
-- **RG-2X2-11 [FUTURO]** Na Rodada de Onze, os parceiros da dupla com 11 **veem as cartas um do outro** depois do descarte (RG-ONZE-3) e antes da decisão de jogar ou correr. A dupla adversária não vê.
-- **RG-2X2-12 [FUTURO]** **Quem decide e por quanto tempo se vê:** na Rodada de Onze, decide pela dupla o jogador dela que joga primeiro na 1ª vaza. Como no aumento (RG-2X2-10), a mão do parceiro aparece só até a decisão de jogar ou correr.
-- **RG-2X2-13 [FUTURO]** Na Rodada Escurinho, os quatro jogam às cegas (RG-ESCURINHO-1), e ninguém vê as cartas do parceiro.
+- **RG-2X2-11 [DEFINIDA]** Na Rodada de Onze, os parceiros da dupla com 11 **veem as cartas um do outro** depois do descarte (RG-ONZE-3) e antes da decisão de jogar ou correr. A dupla adversária não vê.
+- **RG-2X2-12 [DEFINIDA]** **Quem decide e por quanto tempo se vê:** na Rodada de Onze, decide pela dupla o jogador dela que joga primeiro na 1ª vaza. Como no aumento (RG-2X2-10), a mão do parceiro aparece só até a decisão de jogar ou correr.
+- **RG-2X2-13 [DEFINIDA]** Na Rodada Escurinho, os quatro jogam às cegas (RG-ESCURINHO-1), e ninguém vê as cartas do parceiro.
 
 **Descarte e informação oculta**
 
-- **RG-2X2-14 [FUTURO]** O descarte segue a seção 4, com qualquer um dos quatro podendo ter a carta da vez. O core não revela quem tem a carta da vez, nem ao parceiro (RG-DESC-10).
-- **RG-2X2-15 [FUTURO]** Só se veem as cartas do parceiro em dois casos: quando a dupla adversária pede aumento (RG-2X2-9) e na Rodada de Onze (RG-2X2-11). Fora deles, **ninguém vê as cartas do parceiro**. A carta encoberta não é revelada a ninguém além de quem a jogou, nem ao parceiro (RG-ENC-3); se a dupla viu as cartas uma da outra naquela rodada, o parceiro já as conhecia.
+- **RG-2X2-14 [DEFINIDA]** O descarte segue a seção 4, com qualquer um dos quatro podendo ter a carta da vez. O core não revela quem tem a carta da vez, nem ao parceiro (RG-DESC-10).
+- **RG-2X2-15 [DEFINIDA]** Só se veem as cartas do parceiro em dois casos: quando a dupla adversária pede aumento (RG-2X2-9) e na Rodada de Onze (RG-2X2-11). Fora deles, **ninguém vê as cartas do parceiro**. A carta encoberta não é revelada a ninguém além de quem a jogou, nem ao parceiro (RG-ENC-3); se a dupla viu as cartas uma da outra naquela rodada, o parceiro já as conhecia.
 
 ## 12. Decisões em aberto
 
-Preencha a coluna "Decisão" e o Claude Code atualiza `OpcoesTrucoPaulista` e os testes. As linhas do 2x2 só registram a decisão no documento: nada do 2x2 é implementado antes do marco dele.
+Preencha a coluna "Decisão" e o Claude Code atualiza `OpcoesTrucoPaulista` e os testes. As decisões do 2x2 estão implementadas desde o marco M11.
 
 | ID | Pergunta | Padrão proposto | Decisão |
 |---|---|---|---|
@@ -225,9 +225,9 @@ Preencha a coluna "Decisão" e o Claude Code atualiza `OpcoesTrucoPaulista` e os
 **Carta encoberta**
 - Na 2ª vaza, X joga 6♣ aberta e Y joga encoberta → X vence a vaza (RG-ENC-2).
 - Na 1ª vaza, nenhuma carta pode ser encoberta (RG-ENC-1).
-- (2x2, futuro) só um jogador joga carta aberta e os outros três encobrem → a dupla dele vence a vaza (RG-2X2-3).
+- (2x2) só um jogador joga carta aberta e os outros três encobrem → a dupla dele vence a vaza (RG-2X2-3).
 
-**2x2 (futuro; mesa A1, B1, A2, B2, e nenhuma das cartas abaixo é manilha)**
+**2x2 (mesa A1, B1, A2, B2, e nenhuma das cartas abaixo é manilha)**
 - A1 joga 3♥, B1 joga 3♠, A2 e B2 jogam cartas mais fracas → as mais fortes são de duplas diferentes: a vaza empata (RG-2X2-4).
 - A1 abre com 3♥, B1 joga 2♠, A2 joga 3♣, B2 joga 7♦ → as mais fortes são da dupla A, mas empatam entre si: a vaza empata, e A1, que a abriu, abre a seguinte (RG-2X2-4, RG-2X2-5).
 - A1 abre com 2♥, B1 joga 3♠, A2 joga 7♣, B2 joga 2♦ → o 3♠ é a mais forte: a dupla B vence a vaza, e B1 abre a seguinte (RG-2X2-3, RG-2X2-5).

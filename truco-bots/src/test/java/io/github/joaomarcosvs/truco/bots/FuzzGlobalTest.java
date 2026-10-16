@@ -2,8 +2,11 @@ package io.github.joaomarcosvs.truco.bots;
 
 import static io.github.joaomarcosvs.truco.bots.Partidas.ANA;
 import static io.github.joaomarcosvs.truco.bots.Partidas.BETO;
+import static io.github.joaomarcosvs.truco.bots.Partidas.CARLA;
+import static io.github.joaomarcosvs.truco.bots.Partidas.DAVI;
 import static io.github.joaomarcosvs.truco.bots.Partidas.MOTOR;
 import static io.github.joaomarcosvs.truco.bots.Partidas.configuracao;
+import static io.github.joaomarcosvs.truco.bots.Partidas.configuracaoEmDuplas;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,11 +20,13 @@ import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
+import io.github.joaomarcosvs.truco.acao.VerCartasDoParceiro;
 import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.evento.RodadaIniciada;
 import io.github.joaomarcosvs.truco.partida.Aplicada;
 import io.github.joaomarcosvs.truco.partida.Aposta;
+import io.github.joaomarcosvs.truco.partida.ConfiguracaoDaPartida;
 import io.github.joaomarcosvs.truco.partida.EquipeId;
 import io.github.joaomarcosvs.truco.partida.EstadoDaPartida;
 import io.github.joaomarcosvs.truco.partida.FaseDaRodada;
@@ -47,13 +52,11 @@ import net.jqwik.api.Label;
 import net.jqwik.api.Property;
 
 /**
- * Fuzz global (CLAUDE.md, seção 6): milhares de partidas completas entre dois {@link BotAleatorio}, conduzidas pelo
- * {@link Arbitro} e conferidas só pela API pública. As verificações finas de vazamento entre duas rodadas ficam nas
- * propriedades do core.
+ * Fuzz global (CLAUDE.md, seção 6): milhares de partidas completas entre {@link BotAleatorio}, no 1x1 e no 2x2,
+ * conduzidas pelo {@link Arbitro} e conferidas só pela API pública. As verificações finas de vazamento entre duas
+ * rodadas ficam nas propriedades do core.
  */
 class FuzzGlobalTest {
-
-    private static final List<JogadorId> JOGADORES = List.of(ANA, BETO);
 
     private static final List<Carta> BARALHO =
             new TrucoPaulista().composicaoDoBaralho().cartas();
@@ -78,17 +81,17 @@ class FuzzGlobalTest {
     private static final List<Acao> TODAS_AS_ACOES = todasAsAcoes();
 
     @Property(tries = 2_000)
-    @Label("Fuzz global (RG-FIM-1, RG-AUM-1): entre dois BotAleatorio, toda partida termina; as ações legais são"
-            + " aceitas e as outras, rejeitadas; o valor fica na escada; o placar nunca diminui; e as 40 cartas se"
-            + " conservam")
-    void invariantes(@ForAll long seed, @ForAll long seedDaAna, @ForAll long seedDoBeto) {
+    @Label("Fuzz global (RG-FIM-1, RG-AUM-1): entre BotAleatorio, no 1x1 e no 2x2, toda partida termina; as ações"
+            + " legais são aceitas e as outras, rejeitadas; o valor fica na escada; o placar nunca diminui; e as 40"
+            + " cartas se conservam")
+    void invariantes(@ForAll boolean emDuplas, @ForAll long seed, @ForAll long seedDaAna, @ForAll long seedDoBeto) {
         Random amostra = new Random(seed);
 
-        EstadoDaPartida fim = jogar(seed, seedDaAna, seedDoBeto, (antes, jogador, acao, aplicada) -> {
+        EstadoDaPartida fim = jogar(emDuplas, seed, seedDaAna, seedDoBeto, (antes, jogador, acao, aplicada) -> {
             EstadoDaPartida depois = aplicada.novoEstado();
             conferirAcaoSorteada(antes, amostra);
             conferirAposta(depois.rodada().aposta());
-            for (JogadorId outro : JOGADORES) {
+            for (JogadorId outro : antes.configuracao().jogadoresNaOrdemDaMesa()) {
                 EquipeId equipe = depois.configuracao().equipeDe(outro);
                 assertThat(depois.placar().pontosDe(equipe))
                         .isGreaterThanOrEqualTo(antes.placar().pontosDe(equipe));
@@ -97,7 +100,7 @@ class FuzzGlobalTest {
         });
 
         EquipeId vencedora = ((FaseDaRodada.PartidaFinalizada) fim.rodada().fase()).vencedora();
-        for (JogadorId jogador : JOGADORES) {
+        for (JogadorId jogador : fim.configuracao().jogadoresNaOrdemDaMesa()) {
             EquipeId equipe = fim.configuracao().equipeDe(jogador);
             if (equipe.equals(vencedora)) {
                 assertThat(fim.placar().pontosDe(equipe)).isGreaterThanOrEqualTo(PONTOS_PARA_VENCER);
@@ -108,15 +111,19 @@ class FuzzGlobalTest {
     }
 
     @Property(tries = 300)
-    @Label("Fuzz global (RG-VIS-1 a RG-VIS-3, RG-ENC-3, RG-DESC-10): a visão que cada bot recebe e os eventos"
-            + " entregues a ele nunca mostram cartas ocultas")
-    void nadaVaza(@ForAll long seed, @ForAll long seedDaAna, @ForAll long seedDoBeto) {
-        conferirVisoes(MOTOR.novaPartida(configuracao(seed)));
+    @Label("Fuzz global (RG-VIS-1 a RG-VIS-3, RG-ENC-3, RG-DESC-10, RG-2X2-15): a visão que cada bot recebe e os"
+            + " eventos entregues a ele nunca mostram cartas ocultas; a mão do parceiro, só quando a dupla se vê")
+    void nadaVaza(@ForAll boolean emDuplas, @ForAll long seed, @ForAll long seedDaAna, @ForAll long seedDoBeto) {
+        conferirVisoes(MOTOR.novaPartida(configuracao(emDuplas, seed)));
 
-        jogar(seed, seedDaAna, seedDoBeto, (antes, jogador, acao, aplicada) -> {
+        jogar(emDuplas, seed, seedDaAna, seedDoBeto, (antes, jogador, acao, aplicada) -> {
             conferirVisoes(aplicada.novoEstado());
             conferirEventos(aplicada);
         });
+    }
+
+    private static ConfiguracaoDaPartida configuracao(boolean emDuplas, long seed) {
+        return emDuplas ? configuracaoEmDuplas(seed) : Partidas.configuracao(seed);
     }
 
     private static List<Acao> todasAsAcoes() {
@@ -126,26 +133,42 @@ class FuzzGlobalTest {
             acoes.add(new JogarEncoberta(indiceNaMao));
             acoes.add(new Descartar(indiceNaMao));
         }
-        acoes.addAll(List.of(new RecusarDescarte(), new PedirAumento(), new Aceitar(), new Correr()));
+        acoes.addAll(List.of(
+                new RecusarDescarte(), new PedirAumento(), new Aceitar(), new Correr(), new VerCartasDoParceiro()));
         return List.copyOf(acoes);
     }
 
-    /** Joga uma partida inteira entre dois bots; falha se ela passar do limite de passos. */
-    private static EstadoDaPartida jogar(long seed, long seedDaAna, long seedDoBeto, ObservadorDaPartida conferencia) {
-        Arbitro arbitro =
-                new Arbitro(MOTOR, Map.of(ANA, new BotAleatorio(seedDaAna), BETO, new BotAleatorio(seedDoBeto)));
+    /**
+     * Joga uma partida inteira entre bots; falha se ela passar do limite de passos. No 2x2, a Carla e o Davi jogam com
+     * as seeds seguintes às da Ana e do Beto.
+     */
+    private static EstadoDaPartida jogar(
+            boolean emDuplas, long seed, long seedDaAna, long seedDoBeto, ObservadorDaPartida conferencia) {
+        Map<JogadorId, Estrategia> bots = emDuplas
+                ? Map.of(
+                        ANA,
+                        new BotAleatorio(seedDaAna),
+                        BETO,
+                        new BotAleatorio(seedDoBeto),
+                        CARLA,
+                        new BotAleatorio(seedDaAna + 1),
+                        DAVI,
+                        new BotAleatorio(seedDoBeto + 1))
+                : Map.of(ANA, new BotAleatorio(seedDaAna), BETO, new BotAleatorio(seedDoBeto));
         int[] passos = {0};
-        return arbitro.jogar(MOTOR.novaPartida(configuracao(seed)), (antes, jogador, acao, aplicada) -> {
-            if (++passos[0] > LIMITE_DE_PASSOS) {
-                fail("A partida passou de %d passos sem terminar", LIMITE_DE_PASSOS);
-            }
-            conferencia.aoAplicar(antes, jogador, acao, aplicada);
-        });
+        return new Arbitro(MOTOR, bots)
+                .jogar(MOTOR.novaPartida(configuracao(emDuplas, seed)), (antes, jogador, acao, aplicada) -> {
+                    if (++passos[0] > LIMITE_DE_PASSOS) {
+                        fail("A partida passou de %d passos sem terminar", LIMITE_DE_PASSOS);
+                    }
+                    conferencia.aoAplicar(antes, jogador, acao, aplicada);
+                });
     }
 
     /** Uma ação qualquer, de um jogador qualquer: o motor a aceita se, e só se, ela está em acoesLegais. */
     private static void conferirAcaoSorteada(EstadoDaPartida estado, Random amostra) {
-        JogadorId jogador = JOGADORES.get(amostra.nextInt(JOGADORES.size()));
+        List<JogadorId> jogadores = estado.configuracao().jogadoresNaOrdemDaMesa();
+        JogadorId jogador = jogadores.get(amostra.nextInt(jogadores.size()));
         Acao acao = TODAS_AS_ACOES.get(amostra.nextInt(TODAS_AS_ACOES.size()));
         boolean legal = MOTOR.acoesLegais(estado, jogador).contains(acao);
         assertThat(MOTOR.aplicar(estado, jogador, acao))
@@ -177,17 +200,19 @@ class FuzzGlobalTest {
     }
 
     /**
-     * A visão de cada jogador não mostra nenhuma carta oculta. A carta da vez no descarte é pública e sai da conferência
-     * (é conferida à parte), porque o que não pode vazar é quem a tem (RG-DESC-10).
+     * A visão de cada jogador não mostra nenhuma carta oculta, e mostra a mão do parceiro exatamente quando a dupla se
+     * vê. A carta da vez no descarte é pública e sai da conferência (é conferida à parte), porque o que não pode vazar
+     * é quem a tem (RG-DESC-10).
      */
     private static void conferirVisoes(EstadoDaPartida estado) {
         Optional<Carta> cartaDaVez = estado.rodada().fase() instanceof FaseDaRodada.AguardandoDescarte(Carta carta)
                 ? Optional.of(carta)
                 : Optional.empty();
-        for (JogadorId jogador : JOGADORES) {
+        for (JogadorId jogador : estado.configuracao().jogadoresNaOrdemDaMesa()) {
             VisaoDoJogador visao = MOTOR.visaoDe(estado, jogador);
             assertThat(visao.cartaDaVezNoDescarte()).isEqualTo(cartaDaVez);
-            conferirQueNaoMostra(semCartaDaVez(visao), ocultasPara(jogador, estado.rodada()), "a visão de " + jogador);
+            assertThat(visao.maosDosParceiros().keySet()).isEqualTo(parceirosVisiveis(jogador, estado));
+            conferirQueNaoMostra(semCartaDaVez(visao), ocultasPara(jogador, estado), "a visão de " + jogador);
         }
     }
 
@@ -197,8 +222,8 @@ class FuzzGlobalTest {
      * que já voltaram ao baralho.
      */
     private static void conferirEventos(Aplicada aplicada) {
-        Rodada depois = aplicada.novoEstado().rodada();
-        for (JogadorId jogador : JOGADORES) {
+        EstadoDaPartida depois = aplicada.novoEstado();
+        for (JogadorId jogador : depois.configuracao().jogadoresNaOrdemDaMesa()) {
             List<Evento> eventos = aplicada.eventos().stream()
                     .filter(evento -> evento.visivelPara(jogador))
                     .toList();
@@ -216,14 +241,41 @@ class FuzzGlobalTest {
     }
 
     /**
-     * As cartas que o jogador não pode ver: o baralho restante e as mãos dos outros (RG-VIS-2), as cartas que os outros
-     * jogaram encobertas (RG-ENC-3) e, na Rodada Escurinho, a própria mão (RG-VIS-3).
+     * Os parceiros cuja mão o jogador pode ver agora, escrito de novo a partir das regras: quando a dupla dele responde
+     * a um aumento e todos quiseram ver as cartas (RG-2X2-10), e na decisão da Rodada de Onze da dupla com 11
+     * (RG-2X2-11). No 1x1, nenhum.
      */
-    private static Set<Carta> ocultasPara(JogadorId jogador, Rodada rodada) {
+    private static Set<JogadorId> parceirosVisiveis(JogadorId jogador, EstadoDaPartida estado) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        List<JogadorId> parceiros = configuracao.parceirosDe(jogador);
+        EquipeId equipe = configuracao.equipeDe(jogador);
+        boolean seVeem = switch (estado.rodada().fase()) {
+            case FaseDaRodada.AguardandoRespostaDeAumento resposta -> {
+                List<JogadorId> querem =
+                        estado.rodada().aposta().pedidoPendente().orElseThrow().queremVerAsCartas();
+                yield configuracao.equipeDe(resposta.respondedor()).equals(equipe)
+                        && querem.contains(jogador)
+                        && querem.containsAll(parceiros);
+            }
+            case FaseDaRodada.DecisaoRodadaDeOnze decisao ->
+                configuracao.equipeDe(decisao.jogador()).equals(equipe);
+            default -> false;
+        };
+        return seVeem ? Set.copyOf(parceiros) : Set.of();
+    }
+
+    /**
+     * As cartas que o jogador não pode ver: o baralho restante e as mãos dos outros, menos as dos parceiros quando a
+     * dupla se vê (RG-VIS-2, RG-2X2-15), as cartas que os outros jogaram encobertas (RG-ENC-3) e, na Rodada
+     * Escurinho, a própria mão (RG-VIS-3).
+     */
+    private static Set<Carta> ocultasPara(JogadorId jogador, EstadoDaPartida estado) {
+        Rodada rodada = estado.rodada();
         Set<Carta> ocultas = new HashSet<>(rodada.baralhoRestante());
         boolean escurinho = rodada.tipo() instanceof TipoDeRodada.Escurinho;
+        Set<JogadorId> visiveis = parceirosVisiveis(jogador, estado);
         rodada.maos().forEach((dono, mao) -> {
-            if (!dono.equals(jogador) || escurinho) {
+            if ((!dono.equals(jogador) && !visiveis.contains(dono)) || escurinho) {
                 ocultas.addAll(mao);
             }
         });
@@ -272,6 +324,7 @@ class FuzzGlobalTest {
                 visao.descartadas(),
                 Optional.empty(),
                 visao.mao(),
+                visao.maosDosParceiros(),
                 visao.cartasNaMao(),
                 visao.vazas(),
                 visao.vazaAtual(),

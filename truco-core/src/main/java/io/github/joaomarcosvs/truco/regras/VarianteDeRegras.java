@@ -21,6 +21,9 @@ public interface VarianteDeRegras {
     /** Rodadas especiais, como a Rodada de Onze e a Rodada Escurinho. */
     RegrasEspeciais regrasEspeciais();
 
+    /** Que formatos de partida a variante aceita e o que os parceiros veem um do outro. */
+    RegrasDeDupla regrasDeDupla();
+
     /** Quantos pontos vencem a partida. */
     PontuacaoDaPartida pontuacaoDaPartida();
 }

@@ -12,7 +12,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = AcaoDto.RecusarDescarte.class, name = "RecusarDescarte"),
     @JsonSubTypes.Type(value = AcaoDto.PedirAumento.class, name = "PedirAumento"),
     @JsonSubTypes.Type(value = AcaoDto.Aceitar.class, name = "Aceitar"),
-    @JsonSubTypes.Type(value = AcaoDto.Correr.class, name = "Correr")
+    @JsonSubTypes.Type(value = AcaoDto.Correr.class, name = "Correr"),
+    @JsonSubTypes.Type(value = AcaoDto.VerCartasDoParceiro.class, name = "VerCartasDoParceiro")
 })
 sealed interface AcaoDto {
 
@@ -29,4 +30,6 @@ sealed interface AcaoDto {
     record Aceitar() implements AcaoDto {}
 
     record Correr() implements AcaoDto {}
+
+    record VerCartasDoParceiro() implements AcaoDto {}
 }

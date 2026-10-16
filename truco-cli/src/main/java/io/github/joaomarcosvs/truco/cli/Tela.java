@@ -12,6 +12,8 @@ import io.github.joaomarcosvs.truco.acao.JogarCarta;
 import io.github.joaomarcosvs.truco.acao.JogarEncoberta;
 import io.github.joaomarcosvs.truco.acao.PedirAumento;
 import io.github.joaomarcosvs.truco.acao.RecusarDescarte;
+import io.github.joaomarcosvs.truco.acao.VerCartasDoParceiro;
+import io.github.joaomarcosvs.truco.partida.JogadorId;
 import io.github.joaomarcosvs.truco.partida.PedidoDeAumento;
 import io.github.joaomarcosvs.truco.partida.TipoDeRodada;
 import io.github.joaomarcosvs.truco.regras.EscadaDeApostas;
@@ -57,10 +59,13 @@ public final class Tela {
             case TipoDeRodada.Escurinho escurinho -> linhas.add("Rodada Escurinho: ninguém vê as próprias cartas.");
             case TipoDeRodada.Normal normal -> {}
         }
-        visao.aposta()
-                .pedidoPendente()
-                .ifPresent(pedido -> linhas.add(comMaiuscula("%s pediu aumento para %d."
-                        .formatted(narrador.nome(pedido.pedinte()), pedido.nivelProposto()))));
+        visao.aposta().pedidoPendente().ifPresent(pedido -> {
+            linhas.add(comMaiuscula(
+                    "%s pediu aumento para %d.".formatted(narrador.nome(pedido.pedinte()), pedido.nivelProposto())));
+            if (!pedido.queremVerAsCartas().isEmpty()) {
+                linhas.add("Quer ver as cartas do parceiro: %s.".formatted(nomes(pedido.queremVerAsCartas())));
+            }
+        });
         if (!visao.descartadas().isEmpty()) {
             linhas.add("Descartadas: " + narrador.cartas(visao.descartadas()));
         }
@@ -77,6 +82,13 @@ public final class Tela {
         if (!visao.vazaAtual().isEmpty()) {
             linhas.add("Vaza %d: %s".formatted(vazas.size() + 1, jogadas(visao.vazaAtual())));
         }
+        // RG-2X2-10 e RG-2X2-11: a mão do parceiro, nos momentos em que a dupla se vê.
+        visao.jogadoresNaOrdemDaMesa().stream()
+                .filter(visao.maosDosParceiros()::containsKey)
+                .forEach(parceiro -> linhas.add("Mão de %s: %s"
+                        .formatted(
+                                narrador.nome(parceiro),
+                                narrador.cartas(visao.maosDosParceiros().get(parceiro)))));
         linhas.add("Sua mão: %s | %s".formatted(mao(visao), cartasDosOutros(visao)));
         return linhas;
     }
@@ -102,7 +114,22 @@ public final class Tela {
                                 .formatted(pendente(visao).nivelProposto());
             case Correr corrida ->
                 "Correr (%s ganha %s)".formatted(narrador.nomeDoAdversario(), pontos(pontosAoCorrer(visao)));
+            case VerCartasDoParceiro ver ->
+                "Ver as cartas de %s (só se os dois quiserem; até a resposta)".formatted(nomes(parceiros(visao)));
         };
+    }
+
+    /** Os outros jogadores da equipe de quem vê (RG-2X2-9). */
+    private static List<JogadorId> parceiros(VisaoDoJogador visao) {
+        return visao.equipes().stream()
+                .filter(equipe -> equipe.jogadores().contains(visao.jogador()))
+                .flatMap(equipe -> equipe.jogadores().stream())
+                .filter(jogador -> !jogador.equals(visao.jogador()))
+                .toList();
+    }
+
+    private String nomes(List<JogadorId> jogadores) {
+        return jogadores.stream().map(narrador::nome).collect(joining(" e "));
     }
 
     private int pontosAoCorrer(VisaoDoJogador visao) {

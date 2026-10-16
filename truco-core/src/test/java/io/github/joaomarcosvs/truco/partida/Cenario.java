@@ -3,6 +3,8 @@ package io.github.joaomarcosvs.truco.partida;
 import static io.github.joaomarcosvs.truco.carta.NotacaoDeCartas.carta;
 import static io.github.joaomarcosvs.truco.partida.Partidas.ANA;
 import static io.github.joaomarcosvs.truco.partida.Partidas.BETO;
+import static io.github.joaomarcosvs.truco.partida.Partidas.CARLA;
+import static io.github.joaomarcosvs.truco.partida.Partidas.DAVI;
 import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DA_ANA;
 import static io.github.joaomarcosvs.truco.partida.Partidas.EQUIPE_DO_BETO;
 
@@ -32,6 +34,7 @@ final class Cenario {
     private List<Carta> topoDoBaralho = List.of();
     private boolean emDescarte;
     private boolean semBaralho;
+    private boolean emDuplas;
     private Placar placar = new Placar(Map.of(EQUIPE_DA_ANA, 0, EQUIPE_DO_BETO, 0));
 
     private Cenario(VarianteDeRegras variante, Optional<Carta> vira) {
@@ -72,6 +75,12 @@ final class Cenario {
         return this;
     }
 
+    /** Partida 2x2: Ana e Carla contra Beto e Davi, sentados nessa ordem (RG-2X2-1). As 4 mãos precisam ser dadas. */
+    Cenario emDuplas() {
+        emDuplas = true;
+        return this;
+    }
+
     /** Deixa o baralho restante vazio, para o caso-limite em que não há carta para comprar. */
     Cenario semBaralhoRestante() {
         semBaralho = true;
@@ -79,8 +88,14 @@ final class Cenario {
     }
 
     EstadoDaPartida montar() {
-        ConfiguracaoDaPartida configuracao =
-                new ConfiguracaoDaPartida(List.of(Equipe.individual(ANA), Equipe.individual(BETO)), variante, 0);
+        ConfiguracaoDaPartida configuracao = emDuplas
+                ? new ConfiguracaoDaPartida(
+                        List.of(
+                                new Equipe(EQUIPE_DA_ANA, List.of(ANA, CARLA)),
+                                new Equipe(EQUIPE_DO_BETO, List.of(BETO, DAVI))),
+                        variante,
+                        0)
+                : new ConfiguracaoDaPartida(List.of(Equipe.individual(ANA), Equipe.individual(BETO)), variante, 0);
         List<Carta> usadas = new ArrayList<>(vira.stream().toList());
         maos.values().forEach(usadas::addAll);
         usadas.addAll(topoDoBaralho);
@@ -103,8 +118,12 @@ final class Cenario {
         if (comDescarte) {
             fase = new FaseDaRodada.AguardandoDescarte(sequenciaDeDescarte.getFirst());
         } else if (tipo instanceof TipoDeRodada.DeOnze onze) {
+            // RG-ONZE-1 e RG-2X2-12: decide quem da equipe com 11 joga primeiro na 1ª vaza.
             fase = new FaseDaRodada.DecisaoRodadaDeOnze(
-                    new JogadorId(onze.equipeComOnze().valor()));
+                    configuracao.jogadoresAPartirDe(configuracao.aDireitaDe(carteador)).stream()
+                            .filter(jogador -> configuracao.equipeDe(jogador).equals(onze.equipeComOnze()))
+                            .findFirst()
+                            .orElseThrow());
         } else {
             fase = new FaseDaRodada.AguardandoJogada(configuracao.aDireitaDe(carteador));
         }
