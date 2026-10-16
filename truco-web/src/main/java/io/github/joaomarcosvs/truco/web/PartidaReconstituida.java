@@ -87,7 +87,7 @@ final class PartidaReconstituida {
             if (suaJogada) {
                 passos.clear();
             }
-            passos.add(Passo.visto(VOCE, aplicada.eventos(), aplicada.novoEstado()));
+            passos.add(Passo.visto(VOCE, aplicada.eventos(), estado, aplicada.novoEstado()));
             estado = aplicada.novoEstado();
         }
         if (proxima < suasJogadas.size()) {

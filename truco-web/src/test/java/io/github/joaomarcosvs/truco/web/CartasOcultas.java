@@ -58,6 +58,34 @@ final class CartasOcultas {
             for (JsonNode evento : eventos.subList(inicioDaRodadaNova, eventos.size())) {
                 assertThat(mostradas(evento)).as("evento %s", evento).doesNotContainAnyElementsOf(ocultas);
             }
+            conferirForcas(json, eventos);
+        }
+    }
+
+    /**
+     * A força só acompanha cartas abertas: a de uma encoberta diria algo sobre a carta (RG-ENC-3). As forças da visão
+     * são uma lista por vaza, na ordem das jogadas.
+     */
+    private static void conferirForcas(JsonNode passo, List<JsonNode> eventos) {
+        for (JsonNode evento : eventos) {
+            boolean cartaAberta = evento.get("evento").get("tipo").asString().equals("CartaJogada");
+            assertThat(evento.has("forca")).as("força no evento %s", evento).isEqualTo(cartaAberta);
+        }
+        JsonNode visao = passo.get("visao");
+        List<JsonNode> vazas = new ArrayList<>();
+        visao.get("vazas").forEach(vaza -> vazas.add(vaza.get("jogadas")));
+        vazas.add(visao.get("vazaAtual"));
+        JsonNode forcas = passo.get("forcas");
+        assertThat(forcas).hasSize(vazas.size());
+        for (int i = 0; i < vazas.size(); i++) {
+            JsonNode jogadas = vazas.get(i);
+            assertThat(forcas.get(i)).hasSize(jogadas.size());
+            for (int j = 0; j < jogadas.size(); j++) {
+                boolean encoberta = jogadas.get(j).get("encoberta").asBoolean();
+                assertThat(forcas.get(i).get(j).isNull())
+                        .as("força da jogada %d da vaza %d", j, i)
+                        .isEqualTo(encoberta);
+            }
         }
     }
 

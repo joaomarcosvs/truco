@@ -5,18 +5,23 @@ import static io.github.joaomarcosvs.truco.web.PartidaReconstituida.MOTOR;
 import static io.github.joaomarcosvs.truco.web.PartidaReconstituida.VOCE;
 
 import io.github.joaomarcosvs.truco.acao.Acao;
+import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.cli.Narrador;
 import io.github.joaomarcosvs.truco.cli.Notacao;
 import io.github.joaomarcosvs.truco.cli.Tela;
+import io.github.joaomarcosvs.truco.evento.CartaJogada;
 import io.github.joaomarcosvs.truco.evento.Evento;
 import io.github.joaomarcosvs.truco.partida.ConfiguracaoDaPartida;
 import io.github.joaomarcosvs.truco.partida.JogadorId;
 import io.github.joaomarcosvs.truco.protocol.ProtocoloJson;
+import io.github.joaomarcosvs.truco.regras.OrdemDeForca;
+import io.github.joaomarcosvs.truco.visao.JogadaVisivel;
 import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import io.github.joaomarcosvs.truco.web.PartidaReconstituida.Reconstituida;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -57,7 +62,12 @@ final class RespostaJson {
 
         ObjectNode resposta = JSON.createObjectNode();
         resposta.put("seed", seed);
-        escreverPassos(resposta.putArray("passos"), partida.passos(), VOCE, narrador);
+        escreverPassos(
+                resposta.putArray("passos"),
+                partida.passos(),
+                VOCE,
+                narrador,
+                configuracao.variante().ordemDeForca());
         VisaoDoJogador visao = MOTOR.visaoDe(partida.estado(), VOCE);
         ArrayNode acoes = resposta.putArray("acoesLegais");
         for (Acao acao : MOTOR.acoesLegais(partida.estado(), VOCE)) {
@@ -94,7 +104,12 @@ final class RespostaJson {
         ArrayNode sairam = resposta.putArray("sairam");
         vista.sairam().forEach(lugar -> sairam.add(lugar.valor()));
         resposta.put("cursor", vista.cursor());
-        escreverPassos(resposta.putArray("passos"), vista.passos(), voce, narrador);
+        escreverPassos(
+                resposta.putArray("passos"),
+                vista.passos(),
+                voce,
+                narrador,
+                configuracao.variante().ordemDeForca());
         ArrayNode acoes = resposta.putArray("acoesLegais");
         for (Sala.Opcao opcao : vista.opcoes()) {
             escreverAcao(acoes, opcao.acao(), tela.opcao(opcao.acao(), opcao.visao()));
@@ -122,16 +137,42 @@ final class RespostaJson {
         };
     }
 
-    private static void escreverPassos(ArrayNode json, List<Passo> passos, JogadorId voce, Narrador narrador) {
+    /**
+     * Os passos, com a força de cada carta aberta jogada, para a página empilhar as cartas de cada vaza sem saber as
+     * regras (RG-CARTAS-2, RG-CARTAS-4 e RG-CARTAS-5: a força depende da vira). Cada {@code CartaJogada} leva a
+     * {@code "forca"} da carta na rodada em que foi jogada. A visão vem com {@code "forcas"}: uma lista por vaza (as
+     * terminadas e, por último, a atual), na ordem das jogadas, com {@code null} nas encobertas, que não contam
+     * (RG-ENC-2) e cuja força revelaria algo da carta (RG-ENC-3). Maior vence; igual empata.
+     */
+    private static void escreverPassos(
+            ArrayNode json, List<Passo> passos, JogadorId voce, Narrador narrador, OrdemDeForca ordem) {
         for (Passo passo : passos) {
             ObjectNode passoJson = json.addObject();
             ArrayNode eventos = passoJson.putArray("eventos");
             for (Evento evento : passo.eventos()) {
-                eventos.addObject()
+                ObjectNode eventoJson = eventos.addObject()
                         .<ObjectNode>set("evento", arvore(ProtocoloJson.escrever(evento)))
                         .put("texto", narrador.descrever(evento));
+                if (evento instanceof CartaJogada jogada) {
+                    eventoJson.put("forca", ordem.forca(jogada.carta(), passo.viraAntes()));
+                }
             }
-            passoJson.set("visao", arvore(ProtocoloJson.escrever(passo.visaoDe(voce))));
+            VisaoDoJogador visao = passo.visaoDe(voce);
+            passoJson.set("visao", arvore(ProtocoloJson.escrever(visao)));
+            ArrayNode forcas = passoJson.putArray("forcas");
+            visao.vazas().forEach(vaza -> escreverForcas(forcas.addArray(), vaza.jogadas(), visao.vira(), ordem));
+            escreverForcas(forcas.addArray(), visao.vazaAtual(), visao.vira(), ordem);
+        }
+    }
+
+    private static void escreverForcas(
+            ArrayNode json, List<JogadaVisivel> jogadas, Optional<Carta> vira, OrdemDeForca ordem) {
+        for (JogadaVisivel jogada : jogadas) {
+            if (jogada.encoberta() || jogada.carta().isEmpty()) {
+                json.addNull();
+            } else {
+                json.add(ordem.forca(jogada.carta().get(), vira));
+            }
         }
     }
 

@@ -64,6 +64,9 @@ const nome = (id) => estado.nomes[id] ?? id;
 const comMaiuscula = (texto) => texto.charAt(0).toUpperCase() + texto.slice(1);
 const plural = (n, palavra) => `${n} ${palavra}${n === 1 ? '' : 's'}`;
 const lista = (nomes) => (nomes.length <= 1 ? nomes.join('') : `${nomes.slice(0, -1).join(', ')} e ${nomes.at(-1)}`);
+/** A sigla de quem joga: a primeira letra de cada palavra do nome, até duas ("Bot 3" vira "B3"; "Ana", "A"). */
+const sigla = (id) =>
+  nome(id).split(/\s+/).filter(Boolean).slice(0, 2).map((parte) => parte.charAt(0).toUpperCase()).join('') || '?';
 
 // ---------- Lugares, equipes e nomes ----------
 
@@ -202,11 +205,24 @@ async function mostrar(passos, acoesLegais, animar) {
       await esperar(PAUSA_FIM_DE_RODADA);
       esconderAviso();
     }
-    visao = passo.visao;
+    visao = comForcas(passo.visao, passo.forcas);
     desenharMesa(visao);
   }
   estado.ultima = { acoes: acoesLegais, visao };
   desenharAcoes(acoesLegais, visao);
+}
+
+/**
+ * A visão com a força de cada jogada, que o servidor manda à parte para a página empilhar as cartas sem saber as regras:
+ * uma lista por vaza, na ordem das jogadas, com null nas encobertas, que não contam.
+ */
+function comForcas(visao, forcas) {
+  const anotar = (jogadas, lista) => jogadas.map((jogada, i) => ({ ...jogada, forca: lista?.[i] ?? null }));
+  return {
+    ...visao,
+    vazas: visao.vazas.map((vaza, i) => ({ ...vaza, jogadas: anotar(vaza.jogadas, forcas?.[i]) })),
+    vazaAtual: anotar(visao.vazaAtual, forcas?.[visao.vazas.length]),
+  };
 }
 
 async function ocupado(tarefa) {
@@ -224,11 +240,12 @@ async function ateFicarLivre() {
 
 /**
  * A mesa depois da última carta da rodada, montada com a visão de antes e os eventos dessa carta: a jogada entra na
- * vaza, e a vaza ganha o resultado. Vazio se a rodada acabou sem carta (alguém correu).
+ * vaza, com a força que veio no evento, e a vaza ganha o resultado. Vazio se a rodada acabou sem carta (alguém correu).
  */
 function mesaNoFimDaRodada(anterior, eventos) {
   const evento = (tipo) => eventos.map((e) => e.evento).find((e) => tipo.includes(e.tipo));
-  const jogou = evento(['CartaJogada', 'CartaEncobertaJogada']);
+  const comTexto = eventos.find((e) => ['CartaJogada', 'CartaEncobertaJogada'].includes(e.evento.tipo));
+  const jogou = comTexto?.evento;
   if (!anterior || !jogou) return null;
   const encoberta = jogou.tipo === 'CartaEncobertaJogada';
   let carta = encoberta ? null : jogou.carta;
@@ -243,7 +260,7 @@ function mesaNoFimDaRodada(anterior, eventos) {
       mao.splice(indice, 1);
     }
   }
-  const jogadas = [...anterior.vazaAtual, { jogador: jogou.jogador, carta, encoberta }];
+  const jogadas = [...anterior.vazaAtual, { jogador: jogou.jogador, carta, encoberta, forca: comTexto.forca ?? null }];
   const fimDaVaza = evento(['VazaFinalizada']);
   return {
     ...anterior,
@@ -281,6 +298,7 @@ function prepararPartida(modo, eu, lugares) {
 
 /** A mesa, o placar e o histórico vazios, para uma partida nova. */
 function limparMesa() {
+  if ($('detalhe-da-vaza').open) $('detalhe-da-vaza').close();
   estado.ultima = null;
   estado.ultimaJogada = null;
   estado.placar = null;
@@ -658,6 +676,8 @@ function desenharMesa(visao) {
   const vazas = $('vazas');
   vazas.replaceChildren();
   vazas.classList.toggle('quatro', duplas());
+  // Todas as pilhas têm a altura de uma vaza completa, para a mesa não pular a cada carta.
+  vazas.style.setProperty('--lugares', String(estado.lugares.length));
   const todas = visao.vazas.map((v) => ({ jogadas: v.jogadas, resultado: v.resultado }));
   if (!visao.vencedoraDaPartida) todas.push({ jogadas: visao.vazaAtual, resultado: null, atual: true });
   while (todas.length < 3) todas.push({ jogadas: [], resultado: null });
@@ -679,7 +699,7 @@ function desenharAssento(assento, id, visao) {
   const vistas = visao.maosDosParceiros?.[id];
   const tamanho = assento.classList.contains('lado') ? 'mini' : 'pequena';
   const jogador = elemento('div', 'jogador');
-  const avatar = elemento('span', `avatar ${lado(id)}`, (nome(id).charAt(0) || '?').toUpperCase());
+  const avatar = elemento('span', `avatar ${lado(id)}`, sigla(id));
   avatar.setAttribute('aria-hidden', 'true');
   const textos = elemento('div');
   const detalhe = vistas
@@ -736,29 +756,10 @@ function desenharInfo(visao) {
   }
 }
 
-/** Uma vaza: no 1x1, a carta do outro em cima e a sua embaixo; no 2x2, as quatro em cruz, cada uma do lado de quem jogou. */
+/** Uma vaza: a pilha das cartas jogadas e, quando acaba, quem venceu. */
 function desenharVaza(vaza, numero) {
   const el = elemento('div', `vaza${vaza.atual ? ' atual' : ''}`);
-  el.append(elemento('span', 'rotulo', `${numero}ª vaza`));
-  const quatro = duplas();
-  const par = elemento('div', quatro ? 'par quatro' : 'par');
-  const tamanho = quatro ? 'vaza4' : 'pequena';
-  for (const pos of quatro ? ['topo', 'esquerda', 'direita', 'baixo'] : ['topo', 'baixo']) {
-    const jogador = estado.lugares.find((lugar) => posicao(lugar.id) === pos)?.id;
-    const jogada = vaza.jogadas.find((j) => j.jogador === jogador);
-    let peca;
-    if (!jogada) {
-      peca = elemento('div', `lugar ${tamanho}`);
-    } else if (!jogada.carta) {
-      peca = Baralho.verso(tamanho);
-    } else {
-      peca = Baralho.carta(jogada.carta, tamanho);
-      if (jogada.encoberta) peca.classList.add('apagada');
-    }
-    peca.classList.add(`pos-${pos}`);
-    par.append(peca);
-  }
-  el.append(par);
+  el.append(elemento('span', 'rotulo', `${numero}ª vaza`), pilha(vaza, numero));
   const resultado = elemento('span', 'resultado');
   if (vaza.resultado?.tipo === 'Vencida') {
     resultado.textContent = nome(vaza.resultado.jogador);
@@ -769,6 +770,74 @@ function desenharVaza(vaza, numero) {
   }
   el.append(resultado);
   return el;
+}
+
+/**
+ * As jogadas de baixo para cima na pilha: por baixo, as que não têm força (as encobertas, que não contam), na ordem em
+ * que foram jogadas; por cima, as abertas, da mais fraca para a mais forte. Numa força igual, a jogada depois fica por
+ * cima. Cada uma leva a sua posição na ordem em que foi jogada.
+ */
+function naOrdemDaPilha(jogadas) {
+  const numeradas = jogadas.map((jogada, ordem) => ({ jogada, ordem }));
+  const semForca = numeradas.filter(({ jogada }) => jogada.forca === null);
+  const comForca = numeradas.filter(({ jogada }) => jogada.forca !== null);
+  comForca.sort((a, b) => a.jogada.forca - b.jogada.forca || a.ordem - b.ordem);
+  return [...semForca, ...comForca];
+}
+
+/** A pilha da vaza: a carta mais forte por cima, e as de baixo aparecendo pela borda, com a inicial de quem jogou. */
+function pilha(vaza, numero) {
+  const botao = elemento('button', 'pilha');
+  botao.type = 'button';
+  if (vaza.jogadas.length === 0) {
+    botao.disabled = true;
+    botao.setAttribute('aria-label', `${numero}ª vaza: nenhuma carta jogada`);
+    botao.append(elemento('div', 'lugar'));
+    return botao;
+  }
+  naOrdemDaPilha(vaza.jogadas).forEach(({ jogada }, altura) => {
+    const carta = desenhoDaJogada(jogada, 'na-pilha');
+    carta.style.setProperty('--altura', altura);
+    const dono = elemento('span', `dono ${lado(jogada.jogador)}`, sigla(jogada.jogador));
+    dono.setAttribute('aria-hidden', 'true');
+    carta.append(dono);
+    botao.append(carta);
+  });
+  botao.setAttribute('aria-label', `${numero}ª vaza: ver as cartas na ordem em que foram jogadas`);
+  botao.title = 'Ver a ordem das cartas';
+  botao.addEventListener('click', () => mostrarVaza(vaza, numero));
+  return botao;
+}
+
+/** A carta da jogada: a encoberta dos outros, virada; a sua encoberta, apagada. */
+function desenhoDaJogada(jogada, tamanho) {
+  if (!jogada.carta) return Baralho.verso(tamanho);
+  const carta = Baralho.carta(jogada.carta, tamanho);
+  if (jogada.encoberta) carta.classList.add('apagada');
+  return carta;
+}
+
+/** As cartas da vaza na ordem em que foram jogadas, com quem jogou cada uma, numa janela sobre a mesa. */
+function mostrarVaza(vaza, numero) {
+  const janela = $('detalhe-da-vaza');
+  const lista = elemento('ol', 'jogadas-da-vaza');
+  vaza.jogadas.forEach((jogada, i) => {
+    const item = elemento('li', `jogada-da-vaza ${lado(jogada.jogador)}`);
+    let carta = 'carta encoberta';
+    if (jogada.carta) carta = jogada.encoberta ? `${Baralho.nome(jogada.carta)}, encoberta` : Baralho.nome(jogada.carta);
+    const textos = elemento('div', 'textos');
+    textos.append(elemento('strong', '', `${i + 1}º · ${comMaiuscula(nome(jogada.jogador))}`), elemento('span', '', carta));
+    item.append(desenhoDaJogada(jogada, 'pequena'), textos);
+    lista.append(item);
+  });
+  let situacao = 'Vaza em andamento.';
+  if (vaza.resultado?.tipo === 'Vencida') situacao = `${comMaiuscula(nome(vaza.resultado.jogador))} venceu a vaza.`;
+  else if (vaza.resultado?.tipo === 'Empatada') situacao = 'A vaza empatou.';
+  const fechar = elemento('button', 'botao discreto', 'Fechar');
+  fechar.type = 'button';
+  fechar.addEventListener('click', () => janela.close());
+  janela.replaceChildren(elemento('h3', '', `${numero}ª vaza`), lista, elemento('p', 'situacao-da-vaza', situacao), fechar);
+  janela.showModal();
 }
 
 // ---------- Ações: jogar clicando na carta, e o resto em botões ----------
@@ -1095,6 +1164,12 @@ $('nome').value = ler(CHAVE_NOME) ?? '';
 $('nome').addEventListener('input', () => guardar(CHAVE_NOME, nomeDigitado()));
 
 $('menu').addEventListener('click', () => mostrarInicio());
+// Um clique fora da janela das cartas da vaza a fecha; o Esc já fecha sozinho.
+$('detalhe-da-vaza').addEventListener('click', (e) => {
+  const caixa = e.currentTarget.getBoundingClientRect();
+  const fora = e.clientX < caixa.left || e.clientX > caixa.right || e.clientY < caixa.top || e.clientY > caixa.bottom;
+  if (fora) e.currentTarget.close();
+});
 $('continuar').addEventListener('click', mostrarJogo);
 
 $('bot-1x1').addEventListener('click', () => {

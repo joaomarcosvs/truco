@@ -497,7 +497,7 @@ final class Sala {
             // RG-DESC-1 e RG-DESC-2: a primeira ação depois do descarte o fecha.
             depois = aplicar(passarNoDescarte(atual, aplicadas), jogador, acao, aplicadas);
         }
-        registrar(aplicadas, depois);
+        registrar(atual, aplicadas, depois);
     }
 
     /** Os bots fazem, em ordem, as jogadas cuja hora já chegou. */
@@ -606,19 +606,21 @@ final class Sala {
      * Cada jogador ganha um passo por ação aplicada em que viu algum evento, e pelo menos um por jogada: assim o cursor
      * de todos anda a cada mudança da partida.
      */
-    private void registrar(List<Aplicada> aplicadas, EstadoDaPartida depois) {
+    private void registrar(EstadoDaPartida inicio, List<Aplicada> aplicadas, EstadoDaPartida depois) {
         estado = Optional.of(depois);
         for (JogadorId jogador : configuracao.jogadoresNaOrdemDaMesa()) {
             List<Passo> historico = historicos.get(jogador);
-            int antes = historico.size();
+            int tamanho = historico.size();
+            EstadoDaPartida antes = inicio;
             for (Aplicada aplicada : aplicadas) {
-                Passo passo = Passo.visto(jogador, aplicada.eventos(), aplicada.novoEstado());
+                Passo passo = Passo.visto(jogador, aplicada.eventos(), antes, aplicada.novoEstado());
                 if (!passo.eventos().isEmpty()) {
                     historico.add(passo);
                 }
+                antes = aplicada.novoEstado();
             }
-            if (historico.size() == antes) {
-                historico.add(new Passo(List.of(), depois));
+            if (historico.size() == tamanho) {
+                historico.add(Passo.semEventos(depois));
             }
         }
     }

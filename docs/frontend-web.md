@@ -32,7 +32,8 @@ Uma página para jogar no navegador, contra o `BotAleatorio` ou contra amigos, n
 
 ### A mesa
 
-- Você fica embaixo. No 1x1, o outro jogador fica em cima. No 2x2, o parceiro fica em cima, o adversário que joga depois de você à direita e o outro à esquerda; cada vaza mostra as quatro cartas em cruz, cada uma do lado de quem a jogou.
+- Você fica embaixo. No 1x1, o outro jogador fica em cima. No 2x2, o parceiro fica em cima, o adversário que joga depois de você à direita e o outro à esquerda.
+- Cada vaza é uma **pilha**: a carta mais forte fica por cima, e as de baixo aparecem pela borda, com a sigla de quem jogou ("V" é você; "B3", o Bot 3). As encobertas, que não contam (RG-ENC-2), ficam por baixo; numa força igual, a carta jogada depois fica por cima. Clicando na pilha, uma janela mostra as cartas na ordem em que foram jogadas, com quem jogou cada uma e o resultado da vaza.
 - Quem tem a vez ganha um anel dourado. A sua dupla aparece em dourado, e a outra em azul, no placar, na mesa e no histórico.
 - No celular (até 720 px de largura), as cartas encolhem; no 2x2, a vira fica entre os adversários, e as vazas vão para a linha de baixo.
 
@@ -42,11 +43,15 @@ Uma página para jogar no navegador, contra o `BotAleatorio` ou contra amigos, n
 
 ```json
 {"seed": 2026,
- "passos": [{"eventos": [{"evento": {"tipo": "CartaJogada", "...": "..."}, "texto": "Bot jogou 5 de copas."}], "visao": {"...": "..."}}],
+ "passos": [{"eventos": [{"evento": {"tipo": "CartaJogada", "...": "..."}, "texto": "Bot jogou 5 de copas.", "forca": 2}],
+             "visao": {"...": "..."}, "forcas": [[2]]}],
  "acoesLegais": [{"acao": {"tipo": "JogarCarta", "indiceNaMao": 0}, "texto": "Jogar 2 de bastos"}]}
 ```
 
 - `passos` vai da sua última jogada até agora, com a visão depois de cada passo. A página usa isso para mostrar as jogadas do bot uma a uma.
+- A **força das cartas** vai junto, para a página empilhar as cartas sem saber as regras, porque a força depende da vira (RG-CARTAS-2, RG-CARTAS-4 e RG-CARTAS-5). Maior vence; igual empata.
+  - Cada `CartaJogada` leva `forca`, a força da carta na rodada em que foi jogada. A carta que encerra uma rodada chega no mesmo passo que a rodada seguinte, com outra vira; por isso a força vem no evento.
+  - `forcas` traz, para cada vaza da visão (as terminadas e, por último, a atual), a força de cada jogada, na ordem. As encobertas vêm com `null`: não contam (RG-ENC-2), e a força diria algo da carta (RG-ENC-3).
 - `acoesLegais` traz o que você pode fazer agora; vem vazio quando a partida acaba.
 - Uma jogada ilegal, ou um pedido malformado, recebe `400` com `{"erro": "..."}`.
 
@@ -70,7 +75,8 @@ O código pode vir em minúsculas, com espaço ou hífen. Todas as rotas de uma 
  "lugares": [{"id": "lugar1", "equipe": "dupla1", "nome": "Ana", "bot": false},
              {"id": "lugar2", "equipe": "dupla2", "nome": "Bot 2", "bot": true}, "..."],
  "partida": 1, "queremJogarDeNovo": [], "sairam": [], "cursor": 15,
- "passos": [{"eventos": [{"evento": {"tipo": "CartaJogada", "...": "..."}, "texto": "Bot 2 jogou 5 de copas."}], "visao": {"...": "..."}}],
+ "passos": [{"eventos": [{"evento": {"tipo": "CartaJogada", "...": "..."}, "texto": "Bot 2 jogou 5 de copas.", "forca": 2}],
+             "visao": {"...": "..."}, "forcas": [[2]]}],
  "acoesLegais": [{"acao": {"tipo": "JogarCarta", "indiceNaMao": 0}, "texto": "Jogar 2 de bastos"}]}
 ```
 

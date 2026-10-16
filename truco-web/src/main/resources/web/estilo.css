@@ -19,7 +19,7 @@
   --carta-media: 82px;
   --carta-pequena: 62px;
   --carta-mini: 30px;
-  --carta-vaza4: 48px;
+  --carta-pilha: 86px;
   --titulo: Georgia, "Times New Roman", serif;
 }
 
@@ -353,29 +353,80 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
   border: 1px solid transparent;
 }
 .vaza.atual { border-color: rgba(242, 193, 78, 0.45); background: rgba(242, 193, 78, 0.06); }
-.vaza .par { display: flex; flex-direction: column; gap: 6px; }
 /*
- * No 2x2, as quatro cartas em cruz, cada uma do lado de quem a jogou: o parceiro em cima, você embaixo e os
- * adversários dos lados, na altura do meio.
+ * A pilha da vaza: a carta mais forte por cima e cada uma de baixo aparecendo por uma faixa de --passo pixels, com a
+ * inicial de quem a jogou. --altura (do mesa.js) é a posição na pilha, e --lugares, quantas cartas cabem nela.
  */
-.vaza .par.quatro {
-  display: grid;
-  grid-template-columns: repeat(3, var(--carta-vaza4));
-  grid-template-areas: "esquerda topo direita" "esquerda baixo direita";
-  align-items: center;
-  gap: 4px;
+.pilha {
+  --passo: 24px;
+  position: relative;
+  display: block;
+  width: var(--carta-pilha);
+  height: calc(var(--carta-pilha) * 319 / 208 + (var(--lugares, 2) - 1) * var(--passo));
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
 }
-.par.quatro .pos-topo { grid-area: topo; }
-.par.quatro .pos-baixo { grid-area: baixo; }
-.par.quatro .pos-esquerda { grid-area: esquerda; }
-.par.quatro .pos-direita { grid-area: direita; }
+.vazas.quatro .pilha { --passo: 18px; }
+.pilha:disabled { cursor: default; }
+.pilha:focus-visible { outline: 3px solid var(--ouro); outline-offset: 4px; }
+.pilha .carta, .pilha .lugar { position: absolute; left: 0; top: calc(var(--altura, 0) * var(--passo)); width: var(--carta-pilha); }
+.pilha:hover:not(:disabled) .carta { filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.4)) brightness(1.06); }
+.pilha .dono {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  display: grid;
+  place-items: center;
+  min-width: calc(var(--passo) - 4px);
+  height: calc(var(--passo) - 4px);
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.85);
+  color: #10233f;
+}
+.pilha .dono.voce { background: var(--ouro); color: #2b1d00; }
+.pilha .dono.adversario { background: var(--azul); color: #0b1a33; }
 .vaza .resultado { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; min-height: 1.4em; }
 .resultado.voce { background: var(--ouro); color: #2b1d00; }
 .resultado.adversario { background: var(--azul); color: #0b1a33; }
 .resultado.empate { background: rgba(255, 255, 255, 0.2); }
 
 .lugar { width: var(--carta-pequena); aspect-ratio: 208 / 319; border: 1px dashed rgba(255, 255, 255, 0.2); border-radius: 7px; }
-.lugar.vaza4 { width: var(--carta-vaza4); }
+
+/* A janela com as cartas da vaza na ordem em que foram jogadas. */
+.detalhe-da-vaza {
+  width: min(380px, 92vw);
+  padding: 18px 20px 20px;
+  border: 1px solid var(--linha);
+  border-radius: 16px;
+  color: var(--texto);
+  background: #0c1f15;
+  box-shadow: var(--sombra);
+}
+.detalhe-da-vaza::backdrop { background: rgba(0, 0, 0, 0.55); }
+.detalhe-da-vaza h3 { margin: 0 0 12px; font-family: var(--titulo); font-size: 1.3rem; color: var(--ouro); }
+.jogadas-da-vaza { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.jogada-da-vaza {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border-left: 3px solid transparent;
+  border-radius: 0 10px 10px 0;
+  background: rgba(255, 255, 255, 0.04);
+}
+.jogada-da-vaza.voce { border-left-color: var(--ouro); }
+.jogada-da-vaza.adversario { border-left-color: var(--azul); }
+.jogada-da-vaza .textos { display: flex; flex-direction: column; gap: 2px; }
+.jogada-da-vaza.voce strong { color: var(--ouro); }
+.jogada-da-vaza.adversario strong { color: var(--azul); }
+.detalhe-da-vaza .situacao-da-vaza { margin: 14px 0; color: var(--texto-suave); }
 
 /* ---------- Cartas ---------- */
 
@@ -398,7 +449,7 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 .carta.grande { width: var(--carta-grande); }
 .carta.media { width: var(--carta-media); }
 .carta.pequena { width: var(--carta-pequena); }
-.carta.vaza4 { width: var(--carta-vaza4); }
+.carta.na-pilha { width: var(--carta-pilha); }
 .carta.mini { width: var(--carta-mini); filter: none; }
 .carta.apagada { opacity: 0.55; }
 .carta .posicao {
@@ -567,7 +618,7 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 /* ---------- Telas estreitas ---------- */
 
 @media (max-width: 720px) {
-  :root { --carta-grande: 78px; --carta-media: 60px; --carta-pequena: 46px; --carta-vaza4: 27px; }
+  :root { --carta-grande: 78px; --carta-media: 60px; --carta-pequena: 46px; --carta-pilha: 62px; }
   .topo { grid-template-columns: 1fr auto; padding: 10px 14px; }
   .placar { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
   .marca h1 { font-size: 1.15rem; }
@@ -581,13 +632,14 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
   .meio { flex-wrap: wrap; gap: 12px 10px; }
   .meio .centro { display: contents; }
   .vazas.quatro { order: 1; flex-basis: 100%; justify-content: center; }
+  .pilha { --passo: 18px; }
+  .vazas.quatro .pilha { --passo: 14px; }
+  .pilha .dono { font-size: 0.58rem; padding: 0 3px; }
   .assento.lado { flex: 1 1 0; min-width: 0; }
   .assento.lado .leque { display: none; }
   .time .nome { max-width: 96px; font-size: 0.7rem; letter-spacing: 0.04em; text-align: center; text-wrap: balance; }
   .vazas { gap: 6px; }
   .vaza { padding: 6px; }
-  .vazas.quatro .vaza { padding: 4px; }
-  .vaza .par.quatro { gap: 3px; }
   .duplas-da-sala { grid-template-columns: 1fr; }
   .mao { gap: 8px; }
   .botao { min-width: 96px; padding: 8px 14px; }
