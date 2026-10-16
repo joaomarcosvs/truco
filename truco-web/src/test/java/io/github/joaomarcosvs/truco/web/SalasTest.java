@@ -2,6 +2,7 @@ package io.github.joaomarcosvs.truco.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.joaomarcosvs.truco.partida.JogadorId;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
@@ -16,7 +17,7 @@ class SalasTest {
     private final Salas salas = new Salas(relogio, new Random(42));
 
     private Salas.Criada criar() {
-        return (Salas.Criada) salas.criar();
+        return (Salas.Criada) salas.criar(Sala.Formato.UM_CONTRA_UM, "Ana");
     }
 
     @Test
@@ -38,30 +39,30 @@ class SalasTest {
     void entrar() {
         Salas.Criada criada = criar();
 
-        Salas.Entrada entrada = salas.entrar(criada.sala().codigo());
+        Salas.Entrada entrada = salas.entrar(criada.sala().codigo(), "Beto");
 
         assertThat(entrada).isInstanceOf(Salas.Entrou.class);
         String tokenDoConvidado = ((Salas.Entrou) entrada).token();
         assertThat(tokenDoConvidado).isNotEqualTo(criada.token()).matches("[A-Za-z0-9_-]{22}");
-        assertThat(criada.sala().jogadorDoToken(criada.token())).contains(Sala.ANFITRIAO);
-        assertThat(criada.sala().jogadorDoToken(tokenDoConvidado)).contains(Sala.CONVIDADO);
-        assertThat(salas.entrar(criada.sala().codigo())).isEqualTo(new Salas.Cheia());
+        assertThat(criada.sala().jogadorDoToken(criada.token())).contains(new JogadorId("lugar1"));
+        assertThat(criada.sala().jogadorDoToken(tokenDoConvidado)).contains(new JogadorId("lugar2"));
+        assertThat(salas.entrar(criada.sala().codigo(), "Carla")).isEqualTo(new Salas.Cheia());
         String semSala = criada.sala().codigo().equals("ZZZZZZ") ? "YYYYYY" : "ZZZZZZ";
-        assertThat(salas.entrar(semSala)).isEqualTo(new Salas.NaoExiste());
+        assertThat(salas.entrar(semSala, "Beto")).isEqualTo(new Salas.NaoExiste());
     }
 
     @Test
     @DisplayName("No máximo 100 salas abertas; as que expiram liberam vaga")
     void limite() {
         for (int i = 0; i < Salas.MAXIMO_DE_SALAS; i++) {
-            assertThat(salas.criar()).isInstanceOf(Salas.Criada.class);
+            assertThat(salas.criar(Sala.Formato.UM_CONTRA_UM, "Ana")).isInstanceOf(Salas.Criada.class);
         }
-        assertThat(salas.criar()).isEqualTo(new Salas.SemVaga());
+        assertThat(salas.criar(Sala.Formato.UM_CONTRA_UM, "Ana")).isEqualTo(new Salas.SemVaga());
 
         relogio.avancar(Sala.SEM_JOGADAS);
 
         assertThat(salas.quantas()).isZero();
-        assertThat(salas.criar()).isInstanceOf(Salas.Criada.class);
+        assertThat(salas.criar(Sala.Formato.UM_CONTRA_UM, "Ana")).isInstanceOf(Salas.Criada.class);
     }
 
     @Test
@@ -74,6 +75,6 @@ class SalasTest {
 
         relogio.avancar(Duration.ofSeconds(1));
         assertThat(salas.buscar(criada.sala().codigo())).isEmpty();
-        assertThat(salas.entrar(criada.sala().codigo())).isEqualTo(new Salas.NaoExiste());
+        assertThat(salas.entrar(criada.sala().codigo(), "Beto")).isEqualTo(new Salas.NaoExiste());
     }
 }

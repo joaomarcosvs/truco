@@ -6,6 +6,8 @@ import io.github.joaomarcosvs.truco.carta.Carta;
 import io.github.joaomarcosvs.truco.carta.Naipe;
 import io.github.joaomarcosvs.truco.carta.Valor;
 import io.github.joaomarcosvs.truco.cli.Notacao;
+import io.github.joaomarcosvs.truco.partida.ConfiguracaoDaPartida;
+import io.github.joaomarcosvs.truco.partida.EquipeId;
 import io.github.joaomarcosvs.truco.partida.EstadoDaPartida;
 import io.github.joaomarcosvs.truco.partida.FaseDaRodada;
 import io.github.joaomarcosvs.truco.partida.JogadorId;
@@ -74,8 +76,10 @@ final class CartasOcultas {
     static Set<Carta> para(JogadorId jogador, EstadoDaPartida estado) {
         Rodada rodada = estado.rodada();
         Set<Carta> ocultas = new HashSet<>(rodada.baralhoRestante());
+        Set<JogadorId> parceirosVisiveis = parceirosVisiveis(jogador, estado);
         rodada.maos().forEach((dono, mao) -> {
-            if (!dono.equals(jogador) || rodada.tipo() instanceof TipoDeRodada.Escurinho) {
+            boolean visivel = dono.equals(jogador) || parceirosVisiveis.contains(dono);
+            if (!visivel || rodada.tipo() instanceof TipoDeRodada.Escurinho) {
                 ocultas.addAll(mao);
             }
         });
@@ -86,6 +90,30 @@ final class CartasOcultas {
             ocultas.remove(cartaDaVez);
         }
         return ocultas;
+    }
+
+    /**
+     * Os parceiros cuja mão o jogador pode ver agora, escrito de novo a partir das regras: quando a dupla dele responde
+     * a um aumento e todos quiseram ver as cartas (RG-2X2-10), e na decisão da Rodada de Onze da dupla com 11
+     * (RG-2X2-11). No 1x1, nenhum.
+     */
+    static Set<JogadorId> parceirosVisiveis(JogadorId jogador, EstadoDaPartida estado) {
+        ConfiguracaoDaPartida configuracao = estado.configuracao();
+        List<JogadorId> parceiros = configuracao.parceirosDe(jogador);
+        EquipeId equipe = configuracao.equipeDe(jogador);
+        boolean seVeem = switch (estado.rodada().fase()) {
+            case FaseDaRodada.AguardandoRespostaDeAumento resposta -> {
+                List<JogadorId> querem =
+                        estado.rodada().aposta().pedidoPendente().orElseThrow().queremVerAsCartas();
+                yield configuracao.equipeDe(resposta.respondedor()).equals(equipe)
+                        && querem.contains(jogador)
+                        && querem.containsAll(parceiros);
+            }
+            case FaseDaRodada.DecisaoRodadaDeOnze decisao ->
+                configuracao.equipeDe(decisao.jogador()).equals(equipe);
+            default -> false;
+        };
+        return seVeem ? Set.copyOf(parceiros) : Set.of();
     }
 
     /** As cartas que aparecem no trecho, no formato do protocolo ou em texto. */

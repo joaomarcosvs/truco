@@ -1,5 +1,6 @@
 package io.github.joaomarcosvs.truco.web;
 
+import io.github.joaomarcosvs.truco.partida.JogadorId;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -53,16 +54,20 @@ final class Salas {
     /** O resultado de entrar numa sala. */
     sealed interface Entrada {}
 
-    /** O convidado entrou, com este token. */
-    record Entrou(Sala sala, String token) implements Entrada {}
+    /** A pessoa entrou, com este token, e sentou neste lugar. */
+    record Entrou(Sala sala, String token, JogadorId lugar) implements Entrada {}
 
     /** Não há sala aberta com esse código. */
     record NaoExiste() implements Entrada {}
 
-    /** A sala já tem os dois jogadores. */
+    /** A sala não tem lugar vazio, ou a partida já começou. */
     record Cheia() implements Entrada {}
 
-    synchronized Criacao criar() {
+    /** Já há alguém com esse nome na sala. */
+    record NomeRepetido() implements Entrada {}
+
+    /** Cria uma sala do formato dado, com quem a criou, já com nome válido ({@link Sala#nome}), no primeiro lugar. */
+    synchronized Criacao criar(Sala.Formato formato, String nome) {
         Instant agora = relogio.instant();
         fecharExpiradas(agora);
         if (abertas.size() >= MAXIMO_DE_SALAS) {
@@ -73,18 +78,23 @@ final class Salas {
             codigo = novoCodigo();
         }
         String token = novoToken();
-        Sala sala = new Sala(codigo, aleatorio.nextLong(), token, agora);
+        Sala sala = new Sala(codigo, formato, aleatorio.nextLong(), nome, token, agora);
         abertas.put(codigo, sala);
         return new Criada(sala, token);
     }
 
-    synchronized Entrada entrar(String codigo) {
+    /** A pessoa, já com nome válido ({@link Sala#nome}), entra na sala do código. */
+    synchronized Entrada entrar(String codigo, String nome) {
         Optional<Sala> sala = buscar(codigo);
         if (sala.isEmpty()) {
             return new NaoExiste();
         }
         String token = novoToken();
-        return sala.get().entrar(token, relogio.instant()) ? new Entrou(sala.get(), token) : new Cheia();
+        return switch (sala.get().entrar(nome, token, relogio.instant())) {
+            case Sala.Entrou(JogadorId lugar) -> new Entrou(sala.get(), token, lugar);
+            case Sala.Cheia cheia -> new Cheia();
+            case Sala.NomeRepetido repetido -> new NomeRepetido();
+        };
     }
 
     /** A sala aberta com esse código, digitado como for (ver {@link #normalizar}). */

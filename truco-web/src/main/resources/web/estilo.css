@@ -19,6 +19,7 @@
   --carta-media: 82px;
   --carta-pequena: 62px;
   --carta-mini: 30px;
+  --carta-vaza4: 48px;
   --titulo: Georgia, "Times New Roman", serif;
 }
 
@@ -112,6 +113,7 @@ body {
 .botao.aumento { background: linear-gradient(#ffd96a, var(--ouro-escuro)); color: #2b1d00; font-family: var(--titulo); font-size: 1.05rem; }
 .botao.correr { background: transparent; border-color: var(--vermelho); color: #ffb3a8; box-shadow: none; }
 .botao.neutro { background: rgba(255, 255, 255, 0.12); }
+.botao.ver { background: transparent; border-color: var(--ouro); color: var(--ouro); box-shadow: none; }
 .botao.discreto { min-width: 0; padding: 7px 16px; background: rgba(255, 255, 255, 0.08); border-color: var(--linha); font-weight: 600; box-shadow: none; }
 
 .botao-carta {
@@ -153,6 +155,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  min-width: 0;
   gap: 6px;
   margin: 0;
   padding: 18px 18px 20px;
@@ -186,6 +189,24 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 }
 .campo input:focus { outline: 2px solid var(--ouro); outline-offset: 1px; }
 .campo .botao { min-width: 0; }
+.botoes-formato { display: flex; gap: 8px; align-self: stretch; margin-top: auto; padding-top: 6px; }
+.botoes-formato .botao { flex: 1; min-width: 0; font-family: var(--titulo); font-size: 1.05rem; }
+
+.campo-nome { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; max-width: 320px; }
+.campo-nome span { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--texto-suave); }
+.campo-nome input {
+  width: 100%;
+  padding: 9px 14px;
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 1.05rem;
+  text-align: center;
+  color: var(--texto);
+  background: rgba(0, 0, 0, 0.35);
+}
+.campo-nome input:focus { outline: 2px solid var(--ouro); outline-offset: 1px; }
+.campo-nome input::placeholder { color: var(--texto-suave); opacity: 0.7; }
 .erro-inicio { margin: 0; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--vermelho); background: rgba(120, 30, 20, 0.45); }
 
 /* ---------- Sala esperando o amigo ---------- */
@@ -212,6 +233,27 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 .esperando { margin: 6px 0 0; color: var(--texto-suave); }
 .esperando::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: reticencias 1.4s steps(4, end) infinite; }
 
+/* No 2x2: as duas duplas, com os lugares de cada uma. */
+.duplas-da-sala { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 14px 0; text-align: left; }
+.dupla-da-sala { padding: 10px 12px 12px; border-radius: 12px; border-top: 3px solid var(--azul); background: rgba(255, 255, 255, 0.05); }
+.dupla-da-sala.voce { border-top-color: var(--ouro); }
+.dupla-da-sala > strong { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--texto-suave); }
+.lugar-na-espera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  overflow-wrap: anywhere;
+}
+.lugar-na-espera.seu { outline: 1px solid var(--ouro); color: var(--ouro); font-weight: 700; }
+.lugar-na-espera .vazio { font-style: italic; color: var(--texto-suave); }
+.nota-da-sala { margin: 8px 0 0; font-size: 0.8rem; color: var(--texto-suave); }
+
 @keyframes reticencias {
   0% { content: ""; }
   25% { content: "."; }
@@ -233,9 +275,17 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
   box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.45), var(--sombra);
 }
 
-.lado-adversario { display: flex; align-items: center; justify-content: center; gap: 22px; width: 100%; }
+/* Na sala de espera, a mesa só mostra o aviso com o código e os lugares. */
+.mesa.na-espera > :not(.aviso) { display: none !important; }
+.mesa.na-espera .aviso { position: static; transform: none; width: 100%; max-width: 560px; }
+
+/* ---------- Assentos: você embaixo; os outros em cima e, no 2x2, dos lados ---------- */
+
+.assento { display: flex; align-items: center; justify-content: center; gap: 22px; width: 100%; }
+.assento.lado { flex-direction: column; gap: 10px; width: auto; min-width: 104px; }
+.assento.lado .jogador { flex-direction: column; text-align: center; gap: 6px; }
 .jogador { display: flex; align-items: center; gap: 10px; }
-.jogador strong { display: block; }
+.jogador strong { display: block; overflow-wrap: anywhere; }
 .jogador .detalhe { display: block; font-size: 0.8rem; color: var(--texto-suave); }
 .avatar {
   display: grid;
@@ -247,7 +297,15 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
   color: #0b1a33;
   background: var(--azul);
   box-shadow: 0 0 0 3px rgba(106, 163, 224, 0.3);
+  transition: box-shadow 0.2s;
 }
+.avatar.voce { color: #2b1d00; background: var(--ouro); box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.3); }
+/* Quem tem a vez ganha um anel dourado. */
+.assento.da-vez .avatar { box-shadow: 0 0 0 3px var(--ouro), 0 0 14px rgba(242, 193, 78, 0.7); }
+.assento.da-vez .jogador strong { color: var(--ouro); }
+
+.meio { display: flex; align-items: center; justify-content: center; gap: 18px; width: 100%; }
+.lado-voce { display: flex; justify-content: center; width: 100%; }
 
 .mao { display: flex; align-items: flex-end; justify-content: center; gap: 12px; min-height: calc(var(--carta-grande) * 1.54 + 30px); }
 .leque { gap: 0; min-height: calc(var(--carta-pequena) * 1.54); }
@@ -255,6 +313,12 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 .leque .carta:first-child { margin-left: 0; }
 .leque .carta:nth-child(1) { transform: rotate(-8deg); }
 .leque .carta:nth-child(3) { transform: rotate(8deg); }
+/* As cartas do parceiro, abertas: lado a lado, para dar para ler. */
+.leque.aberta { gap: 6px; }
+.leque.aberta .carta { margin-left: 0; transform: none; }
+.assento.lado .leque { min-height: calc(42px * 1.54); }
+.assento.lado .leque .carta { width: 42px; margin-left: -20px; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.4)); }
+.assento.lado .leque .carta:first-child { margin-left: 0; }
 
 .info { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; min-height: 30px; }
 .etiqueta {
@@ -290,12 +354,28 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 }
 .vaza.atual { border-color: rgba(242, 193, 78, 0.45); background: rgba(242, 193, 78, 0.06); }
 .vaza .par { display: flex; flex-direction: column; gap: 6px; }
+/*
+ * No 2x2, as quatro cartas em cruz, cada uma do lado de quem a jogou: o parceiro em cima, você embaixo e os
+ * adversários dos lados, na altura do meio.
+ */
+.vaza .par.quatro {
+  display: grid;
+  grid-template-columns: repeat(3, var(--carta-vaza4));
+  grid-template-areas: "esquerda topo direita" "esquerda baixo direita";
+  align-items: center;
+  gap: 4px;
+}
+.par.quatro .pos-topo { grid-area: topo; }
+.par.quatro .pos-baixo { grid-area: baixo; }
+.par.quatro .pos-esquerda { grid-area: esquerda; }
+.par.quatro .pos-direita { grid-area: direita; }
 .vaza .resultado { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; min-height: 1.4em; }
 .resultado.voce { background: var(--ouro); color: #2b1d00; }
 .resultado.adversario { background: var(--azul); color: #0b1a33; }
 .resultado.empate { background: rgba(255, 255, 255, 0.2); }
 
 .lugar { width: var(--carta-pequena); aspect-ratio: 208 / 319; border: 1px dashed rgba(255, 255, 255, 0.2); border-radius: 7px; }
+.lugar.vaza4 { width: var(--carta-vaza4); }
 
 /* ---------- Cartas ---------- */
 
@@ -318,6 +398,7 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 .carta.grande { width: var(--carta-grande); }
 .carta.media { width: var(--carta-media); }
 .carta.pequena { width: var(--carta-pequena); }
+.carta.vaza4 { width: var(--carta-vaza4); }
 .carta.mini { width: var(--carta-mini); filter: none; }
 .carta.apagada { opacity: 0.55; }
 .carta .posicao {
@@ -359,6 +440,8 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
+  /* Sem width, o aviso encolheria para a metade da mesa que sobra à direita de left: 50%. */
+  width: max-content;
   max-width: min(520px, 90%);
   padding: 16px 22px;
   border-radius: 16px;
@@ -374,6 +457,9 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 .aviso.fim { padding: 24px 30px; }
 .aviso.fim h3 { margin: 0 0 6px; font-family: var(--titulo); font-size: 1.8rem; color: var(--ouro); }
 .aviso.fim p { margin: 0 0 16px; color: var(--texto-suave); }
+.aviso.fim .placar-final { font-variant-numeric: tabular-nums; }
+.aviso.fim .situacao-do-fim { color: var(--texto); font-weight: 600; }
+.botoes-do-fim { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 
 /* ---------- Histórico (console) ---------- */
 
@@ -481,19 +567,32 @@ button.opcao-de-jogo:focus-visible { outline: 3px solid var(--ouro); outline-off
 /* ---------- Telas estreitas ---------- */
 
 @media (max-width: 720px) {
-  :root { --carta-grande: 78px; --carta-media: 60px; --carta-pequena: 46px; }
+  :root { --carta-grande: 78px; --carta-media: 60px; --carta-pequena: 46px; --carta-vaza4: 27px; }
   .topo { grid-template-columns: 1fr auto; padding: 10px 14px; }
   .placar { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
   .marca h1 { font-size: 1.15rem; }
   .salao { margin: 12px auto; padding: 0 10px; }
   .mesa { padding: 14px 10px; border-width: 7px; border-radius: 20px; }
-  .lado-adversario { gap: 12px; }
-  .centro { gap: 14px; }
+  .assento { gap: 12px; }
+  /*
+   * No 2x2, a vira fica entre os adversários, e as vazas descem para a linha de baixo, na largura toda. Os assentos dos
+   * lados mostram só o avatar, o nome e quantas cartas a pessoa tem.
+   */
+  .meio { flex-wrap: wrap; gap: 12px 10px; }
+  .meio .centro { display: contents; }
+  .vazas.quatro { order: 1; flex-basis: 100%; justify-content: center; }
+  .assento.lado { flex: 1 1 0; min-width: 0; }
+  .assento.lado .leque { display: none; }
+  .time .nome { max-width: 96px; font-size: 0.7rem; letter-spacing: 0.04em; text-align: center; text-wrap: balance; }
   .vazas { gap: 6px; }
   .vaza { padding: 6px; }
+  .vazas.quatro .vaza { padding: 4px; }
+  .vaza .par.quatro { gap: 3px; }
+  .duplas-da-sala { grid-template-columns: 1fr; }
   .mao { gap: 8px; }
   .botao { min-width: 96px; padding: 8px 14px; }
   .inicio { padding: 24px 12px; border-width: 7px; border-radius: 20px; }
-  .opcoes-de-jogo { grid-template-columns: 1fr; }
+  /* minmax(0, 1fr): o campo do código não pode alargar a coluna além da tela. */
+  .opcoes-de-jogo { grid-template-columns: minmax(0, 1fr); }
   .aviso .codigo-da-sala { font-size: 1.7rem; }
 }

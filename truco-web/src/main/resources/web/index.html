@@ -15,7 +15,7 @@
       <h1>Truco Paulista</h1>
     </div>
     <div class="placar" aria-live="polite" aria-label="Placar">
-      <div class="time voce"><span class="nome">Você</span><span class="pontos" id="pontos-voce">0</span></div>
+      <div class="time voce"><span class="nome" id="nome-voce-placar">Você</span><span class="pontos" id="pontos-voce">0</span></div>
       <span class="meta">até 12</span>
       <div class="time adversario"><span class="pontos" id="pontos-adversario">0</span><span class="nome" id="nome-no-placar">Bot</span></div>
     </div>
@@ -25,18 +25,30 @@
   <main class="salao">
     <section class="inicio" id="inicio" aria-labelledby="titulo-inicio" hidden>
       <h2 id="titulo-inicio">Como você quer jogar?</h2>
+      <label class="campo-nome" for="nome">
+        <span>Seu nome</span>
+        <input id="nome" name="nome" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="Como os outros vão te ver">
+      </label>
       <div class="opcoes-de-jogo">
-        <button class="opcao-de-jogo" id="jogar-bot" type="button">
+        <div class="opcao-de-jogo">
           <strong>Contra o bot</strong>
-          <span>Um bot que joga ao acaso. A partida fica no seu navegador.</span>
-        </button>
-        <button class="opcao-de-jogo" id="criar-sala" type="button">
+          <span>Bots que jogam ao acaso. No 2x2, você e um bot contra dois bots.</span>
+          <div class="botoes-formato">
+            <button class="botao neutro" id="bot-1x1" type="button">1x1</button>
+            <button class="botao neutro" id="bot-2x2" type="button">2x2</button>
+          </div>
+        </div>
+        <div class="opcao-de-jogo">
           <strong>Criar sala</strong>
-          <span>Você recebe um código e manda o link para um amigo.</span>
-        </button>
+          <span>Você recebe um código e manda o link. No 2x2, quem faltar quando você começar vira bot.</span>
+          <div class="botoes-formato">
+            <button class="botao neutro" id="sala-1x1" type="button">1x1</button>
+            <button class="botao neutro" id="sala-2x2" type="button">2x2</button>
+          </div>
+        </div>
         <form class="opcao-de-jogo entrar" id="entrar-sala">
           <strong>Entrar numa sala</strong>
-          <label for="codigo-sala">Código que seu amigo mandou</label>
+          <label for="codigo-sala">Código que mandaram para você</label>
           <div class="campo">
             <input id="codigo-sala" name="codigo" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7QF2M" required>
             <button class="botao aceitar" type="submit">Entrar</button>
@@ -48,23 +60,21 @@
     </section>
 
     <div class="jogo" id="jogo" hidden>
-      <section class="mesa" aria-label="Mesa">
-        <div class="lado-adversario">
-          <div class="jogador">
-            <span class="avatar" id="avatar-adversario" aria-hidden="true">B</span>
-            <div><strong id="nome-adversario">Bot</strong><span class="detalhe" id="cartas-adversario"></span></div>
-          </div>
-          <div class="mao leque" id="mao-adversario"></div>
-        </div>
+      <section class="mesa" id="mesa" aria-label="Mesa">
+        <div class="assento" id="assento-topo"></div>
 
         <div class="info" id="info"></div>
 
-        <div class="centro">
-          <figure class="vira">
-            <div id="vira"></div>
-            <figcaption>Vira</figcaption>
-          </figure>
-          <div class="vazas" id="vazas"></div>
+        <div class="meio">
+          <div class="assento lado esquerda" id="assento-esquerda" hidden></div>
+          <div class="centro">
+            <figure class="vira">
+              <div id="vira"></div>
+              <figcaption>Vira</figcaption>
+            </figure>
+            <div class="vazas" id="vazas"></div>
+          </div>
+          <div class="assento lado direita" id="assento-direita" hidden></div>
         </div>
 
         <div class="lado-voce">

@@ -14,6 +14,7 @@ import io.github.joaomarcosvs.truco.partida.JogadorId;
 import io.github.joaomarcosvs.truco.protocol.ProtocoloJson;
 import io.github.joaomarcosvs.truco.visao.VisaoDoJogador;
 import io.github.joaomarcosvs.truco.web.PartidaReconstituida.Reconstituida;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.JsonNode;
@@ -36,7 +37,10 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>Numa sala, sem a seed, que não sai do servidor:
  *
  * <pre>{@code
- * {"situacao": "jogando", "voce": "convidado", "cursor": 15, "passos": [...], "acoesLegais": [...]}
+ * {"situacao": "finalizada", "formato": "2x2", "voce": "lugar3", "anfitriao": "lugar1",
+ *  "lugares": [{"id": "lugar1", "equipe": "dupla1", "nome": "Ana", "bot": false}, ...],
+ *  "partida": 1, "queremJogarDeNovo": ["lugar1"], "sairam": [],
+ *  "cursor": 15, "passos": [...], "acoesLegais": [...]}
  * }</pre>
  */
 final class RespostaJson {
@@ -62,20 +66,33 @@ final class RespostaJson {
         return JSON.writeValueAsString(resposta);
     }
 
-    /** O que um jogador vê da sala. O outro jogador é chamado de "adversário". */
+    /** O que um jogador vê da sala. Nos textos, os outros jogadores aparecem pelo nome; as duplas, como no narrador. */
     static String sala(ConfiguracaoDaPartida configuracao, Sala.Vista vista) {
         JogadorId voce = vista.voce();
-        JogadorId adversario = configuracao.jogadoresNaOrdemDaMesa().stream()
-                .filter(jogador -> !jogador.equals(voce))
-                .findFirst()
-                .orElseThrow();
-        Narrador narrador = new Narrador(
-                voce, Map.of(voce, "você", adversario, "adversário"), configuracao, Notacao.BARALHO_ESPANHOL);
+        Map<JogadorId, String> nomes = new HashMap<>();
+        vista.lugares().forEach(lugar -> lugar.nome().ifPresent(nome -> nomes.put(lugar.id(), nome)));
+        nomes.put(voce, "você");
+        Narrador narrador = new Narrador(voce, nomes, configuracao, Notacao.BARALHO_ESPANHOL);
         Tela tela = new Tela(narrador, configuracao.variante());
 
         ObjectNode resposta = JSON.createObjectNode();
         resposta.put("situacao", situacao(vista.situacao()));
+        resposta.put("formato", vista.formato() == Sala.Formato.DUPLAS ? "2x2" : "1x1");
         resposta.put("voce", voce.valor());
+        resposta.put("anfitriao", vista.anfitriao().valor());
+        ArrayNode lugares = resposta.putArray("lugares");
+        for (Sala.Lugar lugar : vista.lugares()) {
+            lugares.addObject()
+                    .put("id", lugar.id().valor())
+                    .put("equipe", lugar.equipe().valor())
+                    .put("nome", lugar.nome().orElse(null))
+                    .put("bot", lugar.bot());
+        }
+        resposta.put("partida", vista.partida());
+        ArrayNode queremJogarDeNovo = resposta.putArray("queremJogarDeNovo");
+        vista.queremJogarDeNovo().forEach(lugar -> queremJogarDeNovo.add(lugar.valor()));
+        ArrayNode sairam = resposta.putArray("sairam");
+        vista.sairam().forEach(lugar -> sairam.add(lugar.valor()));
         resposta.put("cursor", vista.cursor());
         escreverPassos(resposta.putArray("passos"), vista.passos(), voce, narrador);
         ArrayNode acoes = resposta.putArray("acoesLegais");
@@ -99,7 +116,7 @@ final class RespostaJson {
 
     private static String situacao(Sala.Situacao situacao) {
         return switch (situacao) {
-            case ESPERANDO_ADVERSARIO -> "esperando-adversario";
+            case ESPERANDO_JOGADORES -> "esperando-jogadores";
             case JOGANDO -> "jogando";
             case FINALIZADA -> "finalizada";
         };

@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,10 +38,16 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li>{@code POST /api/partida} com {@code {"seed": 2026, "acoes": [...]}}: a partida contra o bot até agora
  *       ({@link RespostaJson#partida}). Não guarda nada entre pedidos: cada pedido traz a seed e as suas jogadas, e a
  *       partida é refeita ({@link PartidaReconstituida}). Sem {@code seed}, começa uma partida com uma seed sorteada.
- *   <li>{@code POST /api/salas}: cria uma sala para jogar contra um amigo ({@link Sala}), guardada na memória.
- *   <li>{@code POST /api/salas/{codigo}/entrar}: o amigo entra na sala.
+ *   <li>{@code POST /api/salas} com {@code {"formato": "1x1", "nome": "Ana"}}: cria uma sala, 1x1 ou 2x2, para jogar
+ *       contra amigos ({@link Sala}), guardada na memória.
+ *   <li>{@code POST /api/salas/{codigo}/entrar} com {@code {"nome": "Beto"}}: alguém entra na sala.
+ *   <li>{@code POST /api/salas/{codigo}/lugar} com {@code {"lugar": "lugar3"}}: antes da partida, troca de lugar.
+ *   <li>{@code POST /api/salas/{codigo}/comecar}: quem criou a sala começa a partida; os lugares vazios viram bots.
  *   <li>{@code GET /api/salas/{codigo}?desde=N}: o que mudou na sala depois do cursor N ({@link RespostaJson#sala}).
  *   <li>{@code POST /api/salas/{codigo}/jogadas} com {@code {"acao": {...}, "cursor": N}}: uma jogada na sala.
+ *   <li>{@code POST /api/salas/{codigo}/jogar-de-novo}: depois do fim, pede outra partida na mesma sala; ela começa
+ *       quando todas as pessoas pedirem.
+ *   <li>{@code POST /api/salas/{codigo}/sair}: depois do fim, sai da sala; aí ninguém joga de novo nela.
  *   <li>{@code GET /saude}: responde "ok", para o serviço de hospedagem saber que o servidor está de pé.
  * </ul>
  *
@@ -72,7 +79,8 @@ final class ServidorWeb {
                     new Arquivo("/web/baralho-espanhol.png", "image/png", "public, max-age=604800, immutable"));
 
     private static final String SALAS = "/api/salas";
-    private static final Pattern ROTA_DA_SALA = Pattern.compile("/api/salas/([^/]+)(/entrar|/jogadas)?");
+    private static final Pattern ROTA_DA_SALA =
+            Pattern.compile("/api/salas/([^/]+)(/entrar|/lugar|/comecar|/jogadas|/jogar-de-novo|/sair)?");
     private static final Pattern DESDE = Pattern.compile("desde=(\\d{1,9})");
     private static final String SALA_NAO_EXISTE =
             "Não achei essa sala. Confira o código: a sala também some quando expira ou quando o servidor reinicia.";
@@ -186,12 +194,12 @@ final class ServidorWeb {
         }
     }
 
-    // ---------- Salas, contra um amigo ----------
+    // ---------- Salas, contra amigos ----------
 
     private static void salas(HttpExchange troca, Salas salas) throws IOException {
         String caminho = troca.getRequestURI().getPath();
         if (caminho.equals(SALAS)) {
-            if (metodo(troca, "POST") && corpo(troca).isPresent()) {
+            if (metodo(troca, "POST")) {
                 criar(troca, salas);
             }
             return;
@@ -202,29 +210,43 @@ final class ServidorWeb {
             return;
         }
         String codigo = rota.group(1);
-        switch (Objects.requireNonNullElse(rota.group(2), "")) {
-            case "/entrar" -> {
-                if (metodo(troca, "POST") && corpo(troca).isPresent()) {
-                    entrar(troca, salas, codigo);
-                }
-            }
-            case "/jogadas" -> {
-                if (metodo(troca, "POST")) {
-                    jogar(troca, salas, codigo);
-                }
-            }
-            default -> {
-                if (metodo(troca, "GET")) {
-                    vista(troca, salas, codigo);
-                }
-            }
+        String subrota = Objects.requireNonNullElse(rota.group(2), "");
+        if (!metodo(troca, subrota.isEmpty() ? "GET" : "POST")) {
+            return;
+        }
+        switch (subrota) {
+            case "/entrar" -> entrar(troca, salas, codigo);
+            case "/lugar" -> trocarDeLugar(troca, salas, codigo);
+            case "/comecar" -> mudar(troca, salas, codigo, Sala::comecar);
+            case "/jogar-de-novo" -> mudar(troca, salas, codigo, Sala::jogarDeNovo);
+            case "/sair" -> mudar(troca, salas, codigo, Sala::sair);
+            case "/jogadas" -> jogar(troca, salas, codigo);
+            default -> vista(troca, salas, codigo);
         }
     }
 
     private static void criar(HttpExchange troca, Salas salas) throws IOException {
-        switch (salas.criar()) {
+        Optional<String> corpo = corpo(troca);
+        if (corpo.isEmpty()) {
+            return;
+        }
+        PedidoDeSala pedido;
+        try {
+            pedido = PedidoDeSala.ler(corpo.get());
+        } catch (PedidoInvalido e) {
+            responder(troca, 400, JSON_UTF8, RespostaJson.erro(e.getMessage()));
+            return;
+        }
+        switch (salas.criar(pedido.formato(), pedido.nome())) {
             case Salas.Criada(Sala sala, String token) ->
-                responder(troca, 200, JSON_UTF8, RespostaJson.entrada(sala.codigo(), token, Sala.ANFITRIAO));
+                responder(
+                        troca,
+                        200,
+                        JSON_UTF8,
+                        RespostaJson.entrada(
+                                sala.codigo(),
+                                token,
+                                sala.configuracao().jogadoresNaOrdemDaMesa().getFirst()));
             case Salas.SemVaga semVaga ->
                 responder(
                         troca,
@@ -235,12 +257,83 @@ final class ServidorWeb {
     }
 
     private static void entrar(HttpExchange troca, Salas salas, String codigo) throws IOException {
-        switch (salas.entrar(codigo)) {
-            case Salas.Entrou(Sala sala, String token) ->
-                responder(troca, 200, JSON_UTF8, RespostaJson.entrada(sala.codigo(), token, Sala.CONVIDADO));
+        Optional<String> corpo = corpo(troca);
+        if (corpo.isEmpty()) {
+            return;
+        }
+        String nome;
+        try {
+            nome = lerNome(objeto(corpo.get(), Set.of("nome")).get("nome"));
+        } catch (PedidoInvalido e) {
+            responder(troca, 400, JSON_UTF8, RespostaJson.erro(e.getMessage()));
+            return;
+        }
+        switch (salas.entrar(codigo, nome)) {
+            case Salas.Entrou(Sala sala, String token, JogadorId lugar) ->
+                responder(troca, 200, JSON_UTF8, RespostaJson.entrada(sala.codigo(), token, lugar));
             case Salas.NaoExiste naoExiste -> responder(troca, 404, JSON_UTF8, RespostaJson.erro(SALA_NAO_EXISTE));
             case Salas.Cheia cheia ->
-                responder(troca, 409, JSON_UTF8, RespostaJson.erro("Essa sala já tem os dois jogadores."));
+                responder(
+                        troca,
+                        409,
+                        JSON_UTF8,
+                        RespostaJson.erro("Essa sala não tem lugar vazio, ou a partida já começou."));
+            case Salas.NomeRepetido repetido ->
+                responder(
+                        troca,
+                        409,
+                        JSON_UTF8,
+                        RespostaJson.erro("Já tem alguém com esse nome na sala. Escolha outro."));
+        }
+    }
+
+    private static void trocarDeLugar(HttpExchange troca, Salas salas, String codigo) throws IOException {
+        Optional<String> corpo = corpo(troca);
+        if (corpo.isEmpty()) {
+            return;
+        }
+        Optional<Participante> participante = participante(troca, salas, codigo);
+        if (participante.isEmpty()) {
+            return;
+        }
+        JogadorId lugar;
+        try {
+            JsonNode lugarJson = objeto(corpo.get(), Set.of("lugar")).get("lugar");
+            if (lugarJson == null || !lugarJson.isString()) {
+                throw new PedidoInvalido("O pedido precisa de \"lugar\", como \"lugar2\"");
+            }
+            lugar = new JogadorId(lugarJson.asString());
+        } catch (PedidoInvalido | IllegalArgumentException e) {
+            responder(troca, 400, JSON_UTF8, RespostaJson.erro(e.getMessage()));
+            return;
+        }
+        Sala sala = participante.get().sala();
+        responderMudanca(troca, sala, sala.trocarDeLugar(participante.get().jogador(), lugar, salas.agora()));
+    }
+
+    /** Uma mudança na sala que só precisa de quem pede: começar, jogar de novo ou sair. */
+    private interface MudancaDoJogador {
+        Sala.Mudanca aplicar(Sala sala, JogadorId jogador, Instant agora);
+    }
+
+    private static void mudar(HttpExchange troca, Salas salas, String codigo, MudancaDoJogador mudanca)
+            throws IOException {
+        if (corpo(troca).isEmpty()) {
+            return;
+        }
+        Optional<Participante> participante = participante(troca, salas, codigo);
+        if (participante.isEmpty()) {
+            return;
+        }
+        Sala sala = participante.get().sala();
+        responderMudanca(troca, sala, mudanca.aplicar(sala, participante.get().jogador(), salas.agora()));
+    }
+
+    private static void responderMudanca(HttpExchange troca, Sala sala, Sala.Mudanca mudanca) throws IOException {
+        switch (mudanca) {
+            case Sala.Feita(Sala.Vista vista) ->
+                responder(troca, 200, JSON_UTF8, RespostaJson.sala(sala.configuracao(), vista));
+            case Sala.Recusada(String motivo) -> responder(troca, 409, JSON_UTF8, RespostaJson.erro(motivo));
         }
     }
 
@@ -259,7 +352,7 @@ final class ServidorWeb {
             return;
         }
         Sala sala = participante.get().sala();
-        Sala.Vista vista = sala.vistaDe(participante.get().jogador(), cursor.getAsInt());
+        Sala.Vista vista = sala.vistaDe(participante.get().jogador(), cursor.getAsInt(), salas.agora());
         responder(troca, 200, JSON_UTF8, RespostaJson.sala(sala.configuracao(), vista));
     }
 
@@ -292,6 +385,34 @@ final class ServidorWeb {
             case Sala.Ilegal ilegal ->
                 responder(troca, 400, JSON_UTF8, RespostaJson.erro("Essa jogada não vale agora."));
         }
+    }
+
+    /** O corpo de {@code POST /api/salas}: o formato ({@code "1x1"} ou {@code "2x2"}) e o nome de quem cria. */
+    private record PedidoDeSala(Sala.Formato formato, String nome) {
+
+        static PedidoDeSala ler(String corpo) throws PedidoInvalido {
+            JsonNode raiz = objeto(corpo, Set.of("formato", "nome"));
+            JsonNode formato = raiz.get("formato");
+            if (formato == null || !formato.isString()) {
+                throw new PedidoInvalido("O pedido precisa de \"formato\": \"1x1\" ou \"2x2\"");
+            }
+            Sala.Formato lido = switch (formato.asString()) {
+                case "1x1" -> Sala.Formato.UM_CONTRA_UM;
+                case "2x2" -> Sala.Formato.DUPLAS;
+                default -> throw new PedidoInvalido("O formato precisa ser \"1x1\" ou \"2x2\"");
+            };
+            return new PedidoDeSala(lido, lerNome(raiz.get("nome")));
+        }
+    }
+
+    /** O nome que a pessoa escolheu, já arrumado; inválido se não serve como nome na sala ({@link Sala#nome}). */
+    private static String lerNome(JsonNode json) throws PedidoInvalido {
+        if (json == null || !json.isString()) {
+            throw new PedidoInvalido("O pedido precisa de \"nome\"");
+        }
+        return Sala.nome(json.asString())
+                .orElseThrow(() -> new PedidoInvalido("Nome inválido: use de 1 a 16 letras, números ou espaços, e"
+                        + " não \"você\" nem \"Bot\" com número"));
     }
 
     /** Quem fez o pedido numa sala. */
